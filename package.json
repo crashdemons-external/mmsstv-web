@@ -1,0 +1,9 @@
+{
+  "name": "mmsstv-web",
+  "private": true,
+  "scripts": {
+    "build": "python scripts/build.py",
+    "start": "python scripts/serve.py",
+    "test": "node tests/core.test.cjs && node tests/audio.test.cjs && node tests/encoder.test.cjs"
+  }
+}

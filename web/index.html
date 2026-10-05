@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Decode SSTV audio and generate SSTV WAV files from images locally with the original MMSSTV DSP.">
+  <title>MMSSTV web — Ver 1.13A</title>
+  <link rel="icon" href="assets/mmsstv.ico">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="mmsstv-core.js"></script>
+  <script defer src="audio.js"></script>
+  <script defer src="engine.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<main class="desktop" id="desktop" aria-label="MMSSTV browser receiver">
+  <div class="titlebar"><img src="assets/mmsstv.ico" alt=""><span id="window-title">MMSSTV — Ver 1.13A (Web)</span><span class="title-end">RX / WAV export</span></div>
+  <nav class="menubar" aria-label="Main menu">
+    <div class="menu"><button aria-expanded="false"><u>F</u>ile</button><div class="menu-popup">
+      <button data-action="open-audio">Play sound from file…<kbd>Ctrl+O</kbd></button>
+      <button data-action="microphone">Audio input from microphone…</button>
+      <button data-action="stop">Stop sound input</button><hr>
+      <button data-action="tx-open">Open TX picture…</button><button data-action="generate-wav" class="needs-tx-image" disabled>Generate SSTV WAV…</button><hr>
+      <button data-action="save-image" class="needs-image" disabled>Save picture…<kbd>Ctrl+S</kbd></button>
+      <button data-action="export-history">Save history data…</button>
+      <button data-action="export-log">Save log data…</button><hr>
+      <button disabled>Print…</button><button disabled>Exit</button>
+    </div></div>
+    <div class="menu"><button aria-expanded="false"><u>E</u>dit</button><div class="menu-popup">
+      <button data-action="copy-image" class="needs-image" disabled>Copy picture</button>
+      <button data-action="add-history" class="needs-image" disabled>Copy to history</button>
+      <button data-action="clear-image">Clear RX picture</button><hr>
+      <button data-action="copy-to-tx" class="needs-image" disabled>Copy picture to TX</button><button disabled>Edit template</button>
+    </div></div>
+    <div class="menu"><button aria-expanded="false"><u>V</u>iew</button><div class="menu-popup">
+      <button data-action="view-rx">RX</button><button data-action="view-sync">Sync</button><button data-action="view-history">History</button><button data-action="view-tx">TX picture</button>
+      <button data-action="zoom" class="needs-image" disabled>Received picture…</button>
+      <button data-action="play-position">Adjust play position…</button><hr>
+      <button data-action="spectrum-view">Spectrum / waterfall</button>
+    </div></div>
+    <div class="menu"><button aria-expanded="false"><u>O</u>ption</button><div class="menu-popup">
+      <button disabled>Output sound level…</button><button data-action="microphone">Input sound device…</button><hr>
+      <button disabled>Repeater…</button><button data-action="log-settings">Setup logging…</button>
+      <button data-action="settings">Setup MMSSTV…</button>
+    </div></div>
+    <div class="menu"><button aria-expanded="false">P<u>r</u>ofiles</button><div class="menu-popup" id="profiles-menu">
+      <button data-profile="default">Default</button><button data-profile="weak">Weak signal</button><button data-profile="clean">Clean recording</button><hr>
+      <button data-action="save-profile">Save current profile…</button>
+    </div></div>
+    <div class="menu"><button disabled>Program</button></div>
+    <div class="menu"><button disabled title="Radio control is unavailable in this browser port">RadioCommand</button></div>
+    <div class="menu"><button aria-expanded="false"><u>H</u>elp</button><div class="menu-popup">
+      <button data-action="help">MMSSTV web help</button><button data-action="about">About MMSSTV…</button>
+    </div></div>
+  </nav>
+  <div class="workspace">
+    <section class="picture-panel">
+      <div class="tabs" role="tablist" aria-label="Picture views">
+        <button role="tab" id="tab-sync" data-tab="sync" aria-selected="false" aria-controls="panel-sync">Sync</button>
+        <button role="tab" id="tab-rx" data-tab="rx" aria-selected="true" aria-controls="panel-rx">RX</button>
+        <button role="tab" id="tab-history" data-tab="history" aria-selected="false" aria-controls="panel-history">History</button>
+        <button role="tab" id="tab-tx" data-tab="tx" aria-selected="false" aria-controls="panel-tx" title="Prepare an image and generate an SSTV audio file">TX</button>
+        <button role="tab" disabled title="Transmit template editing has not been ported">Template</button>
+      </div>
+      <div class="picture-well">
+        <div role="tabpanel" id="panel-rx" aria-labelledby="tab-rx"><canvas id="rx-picture" width="320" height="256" aria-label="Received SSTV picture"></canvas></div>
+        <div role="tabpanel" id="panel-sync" aria-labelledby="tab-sync" hidden><canvas id="sync-picture" width="320" height="256" aria-label="Received synchronization signal"></canvas></div>
+        <div role="tabpanel" id="panel-history" aria-labelledby="tab-history" hidden><canvas id="history-picture" width="320" height="256" aria-label="Selected history picture"></canvas><span id="history-caption"></span></div>
+        <div role="tabpanel" id="panel-tx" aria-labelledby="tab-tx" hidden><canvas id="tx-picture" width="320" height="256" aria-label="Image for SSTV audio generation"></canvas><span id="tx-caption"></span></div>
+      </div>
+      <div class="rx-toolbar" id="rx-toolbar">
+        <button id="lock" aria-pressed="false" title="Prevent automatic receiver restart and mode changes">Lock</button>
+        <button data-action="resync" title="Restart reception in the current mode">ReSync</button>
+        <label><input type="checkbox" id="auto-history" checked>Auto history</label>
+        <button class="icon needs-image" data-action="add-history" disabled title="Copy to history"><img src="assets/SBWHist.png" alt="Copy to history"></button>
+        <button class="icon needs-image" data-action="save-image" disabled title="Save received picture"><img src="assets/SBCol.png" alt="Save picture"></button>
+        <button class="icon needs-image" data-action="zoom" disabled title="View full-size picture"><img src="assets/SBZoom.png" alt="Zoom"></button>
+      </div>
+      <div class="sync-toolbar" id="sync-toolbar" hidden>
+        <button data-action="phase-left" title="Shift one pixel left">&lt;</button><button data-action="phase-right" title="Shift one pixel right">&gt;</button>
+        <button data-action="sync-adjust">Phase / Slant…</button><button data-action="sync-reset">Reset</button>
+        <label><input id="auto-slant" type="checkbox">Auto slant</label><button disabled>TX</button>
+      </div>
+      <div class="history-toolbar" id="history-toolbar" hidden>
+        <button data-action="history-prev">&lt;</button><span id="history-number">0 / 0</span><button data-action="history-next">&gt;</button>
+        <button data-action="save-image" class="needs-image" disabled>Save…</button><button data-action="delete-history">Delete</button>
+        <button class="icon" data-action="zoom" title="View full-size picture"><img src="assets/SBZoom.png" alt="Zoom"></button>
+      </div>
+      <div class="tx-toolbar" id="tx-toolbar" hidden>
+        <button disabled title="Live radio transmission is unavailable">TX</button><button disabled title="Speaker and radio tone output is unavailable">Tune</button>
+        <button data-action="tx-open">Open…</button><button data-action="generate-wav" class="needs-tx-image" disabled>Generate WAV…</button>
+        <button class="icon needs-tx-image" data-action="zoom" disabled title="View full-size TX picture"><img src="assets/SBZoom.png" alt="Zoom"></button>
+      </div>
+    </section>
+    <aside class="mode-panel">
+      <fieldset><legend id="mode-legend">RX Mode</legend><div id="rx-modes"></div></fieldset>
+      <fieldset class="dsp"><legend>DSP</legend><button id="afc" aria-pressed="true">AFC</button><button id="lms" aria-pressed="false">LMS</button></fieldset>
+    </aside>
+    <section class="signal-log">
+      <div class="signal-panel">
+        <div class="level-well" aria-label="Audio input level"><div id="audio-level"></div></div>
+        <div class="signal-right"><canvas id="frequency-scale" width="360" height="18" aria-label="Frequency scale"></canvas>
+          <canvas id="spectrum" width="360" height="90" aria-label="Audio spectrum"></canvas>
+          <canvas id="waterfall" width="360" height="38" aria-label="Audio waterfall"></canvas>
+        </div>
+      </div>
+      <fieldset class="log-panel"><legend>Log</legend>
+        <div class="log-line"><label for="call">Call</label><input id="call" maxlength="30" autocomplete="off"><label for="his-rst">His</label><input id="his-rst" value="595" list="rst-values" maxlength="5"><label for="my-rst">My</label><input id="my-rst" list="rst-values" maxlength="5"></div>
+        <div class="log-line"><label for="name">Name</label><input id="name" maxlength="80"><label for="qth">Qth</label><input id="qth" maxlength="100"></div>
+        <div class="log-line"><label for="note">Note</label><input id="note" maxlength="200"></div>
+        <div class="log-line"><label for="qsl">QSL</label><input id="qsl" maxlength="100"><button id="rx-id" aria-pressed="false" title="Enable received FSK ID decoding">RxID</button><button id="tx-id" aria-pressed="false" title="Include FSK callsign in generated SSTV WAV files">TxID</button><button class="icon" disabled title="External logging link unavailable"><img src="assets/SBULog.png" alt="External log"></button></div>
+        <div class="log-buttons"><button id="save-qso" title="Save this entry in the browser log">QSO</button><button data-action="log-data">Data</button><button disabled>Find</button><button data-action="clear-log">Clear</button><button data-action="log-list">List</button><input id="frequency" value="14.230" list="frequency-values" aria-label="Log frequency MHz"></div>
+      </fieldset>
+      <div class="template-options"><label><input type="checkbox" disabled>Show with template</label><label class="unavailable"><input type="checkbox" checked disabled>Draft</label><span id="rx-info">Ready</span></div>
+    </section>
+  </div>
+  <div class="stock-tabs tabs" aria-label="Stock pictures">
+    <button data-action="stock-pictures" class="selected">S.pix</button><button disabled>S.templates 1</button><button disabled>2</button><button disabled>3</button><button disabled>4</button>
+    <span class="stock-tools"><span id="stock-count">0/32</span><button data-action="stock-import" title="Add a local picture">Open…</button><button data-action="stock-prev">◀</button><button data-action="stock-next">▶</button></span>
+  </div>
+  <div class="stock-grid" id="stock-grid" aria-label="Saved and stock pictures"></div>
+  <div class="audio-bar">
+    <button id="mic-button" data-action="microphone" disabled>Mic…</button><button id="open-button" data-action="open-audio" disabled>Open audio…</button>
+    <button id="pause-button" data-action="pause" disabled>Pause</button><button id="stop-button" data-action="stop" disabled>Stop</button>
+    <div class="source-summary"><span id="source-name">Initializing MMSSTV…</span><progress id="file-progress" max="1" value="0" aria-label="Audio file progress"></progress></div>
+    <button data-action="save-image" class="needs-image" disabled>Save…</button>
+  </div>
+  <div class="statusbar" role="status"><span id="status">Loading original MMSSTV receiver…</span><span id="mode-status">Auto</span><span id="time-status">00:00</span><span>11025 Hz</span></div>
+</main>
+<datalist id="rst-values"><option value="595"><option value="575"><option value="555"><option value="594"><option value="574"><option value="554"><option value="444"><option value="333"></datalist>
+<datalist id="frequency-values"><option value="7.033"><option value="14.230"><option value="21.340"><option value="28.680"><option value="144.450"></datalist>
+<input type="file" id="audio-file" accept="audio/*,.mmv,.wav,.wave,.mp3,.ogg,.flac,.m4a,.aac" hidden>
+<input type="file" id="image-file" accept="image/*" multiple hidden>
+<input type="file" id="tx-image-file" accept="image/*" hidden>
+<dialog id="modal" class="classic-dialog" aria-labelledby="dialog-title">
+  <div class="dialog-titlebar"><span id="dialog-title"></span><button id="dialog-close" aria-label="Close dialog">×</button></div>
+  <div id="dialog-content"></div>
+</dialog>
+</body>
+</html>

@@ -1,5 +1,5 @@
 # Supplied reference archives and local toolchain; prepared source and assets
-# live in vendor/ and web/ and are intended to be committed.
+# live in native/ and web/ and are intended to be committed.
 /reference/
 /.tools/
 
@@ -8,6 +8,14 @@
 /dist/
 /out/
 /web/fldigi-web-source.zip
+/coverage/
+/.cache/
+/.pytest_cache/
+/.mypy_cache/
+/.ruff_cache/
+/.vite/
+/.parcel-cache/
+*.tsbuildinfo
 
 # Local editor settings and operating-system files.
 .idea/
@@ -21,9 +29,6 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 
 # Logs and private local configuration.
 *.log
@@ -32,10 +37,32 @@ venv/
 !.env.example
 *.private
 .private
+*.secret
+*.credentials
+credentials.json
+secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.db
+*.sqlite
+*.sqlite3
+id_rsa
+id_ed25519
+id_ecdsa
+/.aws/
+/.azure/
+/.gcloud/
+/.ssh/
+/private/
+/data/
+/recordings/
+/captures/
 AGENTS.md
 PORTING_INSTRUCTIONS.md
-
-
 
 # Compiled Object files
 *.slo

@@ -1,0 +1,17 @@
+{
+  "upstream": "MMSSTV 1.13A",
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)",
+  "modeCount": 43,
+  "sources": {
+    "sstv.cpp": "f42c3f7e683e07a71feaeecd7c96b3415eee7889fe0e5276b82692b354372e0b",
+    "sstv.h": "331cd3fd08ae85a38cd5ad82036ede0dc1792ae04e747e567f1c98be9ca1bb00",
+    "fir.cpp": "d393125cf5e9f1f167b50ab17430388c7f6fb53145c71748bb8c5705ab136cc6",
+    "fir.h": "fa57f63855c6de848fe3526a878fa23c3a09a3a8dad5bb98fa7b91382011697d",
+    "Fft.cpp": "41366718ceb6d1c5a968826882453bc2d24578fe619dc70ecec98563504ad213",
+    "Fft.h": "d147cdc9369f41978567b579e030937c2f8d00025c87778ed69f6c0c0e1c75de",
+    "Main.cpp": "92a3b3f768d600ac55300827b4fd382a6ef62f38852752c7f88b56673b916d56",
+    "ComLib.cpp": "e5632bb45b1703a2e99b09439b9102503f7bf5f17dde16099c6b6f3f477b6c03"
+  },
+  "coreSha256": "a106f08ac5804ec659bef3d09d5c2365164836d99bc5192b801846d93a2e53ef",
+  "wasmSha256": "07459791079c03dee35205c8e7f50da83cc8a4090a8870fd04755f9ef070662d"
+}
