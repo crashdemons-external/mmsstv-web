@@ -6,6 +6,8 @@ synchronization and RGB/YUV image drawing run in
 WebAssembly. The HTML/CSS interface follows the supplied desktop screenshots,
 VCL forms and original toolbar artwork.
 
+Live demo: <https://crashdemons-external.github.io/mmsstv-web/>
+
 ## Run
 
 The built application is **`web/index.html`**. Serve the `web/` directory
