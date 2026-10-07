@@ -1,5 +1,5 @@
 {
-  "upstream": "MMSSTV 1.13A + QSSTV AVT24/94 and FAX480",
+  "upstream": "MMSSTV 1.13A + QSSTV AVT24/94 and FAX480 + fldigi 4.2.13 WEFAX",
   "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)",
   "modeCount": 46,
   "sources": {
@@ -25,5 +25,41 @@
     "coreSha256": "70e8e8796c7eb66cc226813378b3d4af3b6edba1a84c649fe3c80387ec32ddaf",
     "wasmSha256": "11208424a79145a747c4f60d67dd06e27bae34b562411a8267b2295cd9db17b4"
   },
-  "assetVersion": "e2a5ae329ddf88eb"
+  "assetVersion": "01c4d0535cd53875",
+  "wefax": {
+    "version": "fldigi 4.2.13",
+    "modes": [
+      "IOC576",
+      "IOC288"
+    ],
+    "sources": {
+      "origin": "fldigi 4.2.13, selected unmodified files copied from local fldigi-web/vendor/fldigi",
+      "files": {
+        "src/wefax/wefax.cxx": "9db8f98071bd755891ae4f30733478c8fbb01ab253fe3017d81b9ffdfa463aba",
+        "src/filters/filters.cxx": "dd173d653bd5fd7a91897ff7b7131587a6b472d52c6d2938e08163dc82b619bb",
+        "src/filters/fftfilt.cxx": "1eae8bd0e69c267eb611b357043905201c401e90c7bb098c9b31ec370938f7ad",
+        "src/misc/strutil.cxx": "8cfbd07b6f280faa305850a2d9d95ac598e6d74c25f7fb41b66c0963b6244083",
+        "src/trx/modem.cxx": "9a6206e4d744c462a4b986c2de3fc7323fea95ede55ea4361cb49ec990a95e4e",
+        "src/globals/globals.cxx": "e4f4663432419ab757058d45d75dbf19fc4eb09afa4b3cb8c87390e3992462f8",
+        "src/include/configuration.h": "371752694a73a3e3c7f8ab375990f360545d4ae882b082dc2ca67224ee78465f",
+        "src/include/status.h": "7569d40362158d83843b4c569a0200e5a4e1cc4444885af0aa2806fd078f62a3",
+        "src/include/globals.h": "65fa9d98cb6477edc9f52c89b8a1f987a0922ab05391c16225d2a83ddbe25ec5",
+        "src/include/complex.h": "ed053993abc3e502ebefdc5d4ff2f96234ed40c8f82d42d3175a08f610422d1e",
+        "src/include/misc.h": "584d871f4410194c2fbc25ab95795dd138336fb98c900f4b1d8b8a5964513ffc",
+        "src/include/ascii.h": "b8f300e9ba98fccb2aa5205b620041ecc48339513903312ed8a281ac9a87f164",
+        "src/include/filters.h": "d69cc12199c0507d37a835429d0f52280c3c6054371334bbde1b77009d2b2ca2",
+        "src/include/fftfilt.h": "ad6a0870e0f3dcc7bd268d12b51faf520409ce71d7fb2814cc1fb74cc42e271f",
+        "src/include/gfft.h": "4290721f0caaf26622f4bf51a28382dfcdf57e07316888deb77c1fcaf66db600",
+        "src/include/mbuffer.h": "eb7cc5ff1607f31a2d6ea9a7a94f7de27a9015eadffb845cad944ee9fa0ab0a4",
+        "src/include/wefax.h": "33e4b40afd2275992f2e784030936f9ae8f663064fd034ddcfa55fc9e5c20490",
+        "src/include/re.h": "37a934ef1edfc69a40369b23fef4a3f7298234275ad94be092832386ba959aae",
+        "src/include/morse.h": "78c6f2e4a72ffda061378c5d4451289e0576645b96cba4afab8aaa5e404295df",
+        "src/include/modem.h": "0f6b2b2af7b1246023ba2eb34e0525f6dec52a05e898146dab2a1bbf795df532",
+        "src/include/strutil.h": "2a1d4634fc1f3d540fb1950e986346a160c6e4af39e05ae0476b996060f6567b"
+      }
+    },
+    "coreSha256": "9434eadca33cbabe805435bcc70fb8ad64f2b09eeefe0a051e6b7275f03e9e93",
+    "wasmSha256": "9ecd7349891ead489a9f4bcd5137ad4b0a0e984ec0d25eab5c5f1ebf967587df"
+  },
+  "imageModeCount": 48
 }

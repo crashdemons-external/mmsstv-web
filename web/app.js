@@ -2,13 +2,13 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const defaults={afc:true,lms:false,bpf:1,demodulator:2,sensitivity:1,autoStop:true,autoSync:true,autoSlant:false,autoHistory:true,differentiator:false,fftGain:1,fskId:false,txFskId:false,channel:'left',speed:'max',historyLimit:32,myCall:'',deviceId:'',interface:'mmsstv',imageFormat:'png',stretch:true,imageBackground:'#000080',galleryRows:4,galleryColumns:4,savePercent:40,recordAudio:false,recordLimit:100};
+const defaults={afc:true,lms:false,bpf:1,demodulator:2,sensitivity:1,autoStop:true,autoSync:true,autoSlant:false,autoHistory:true,differentiator:false,fftGain:1,fskId:false,txFskId:false,channel:'left',speed:'max',historyLimit:32,myCall:'',deviceId:'',interface:'mmsstv',imageFormat:'png',stretch:true,imageBackground:'#000080',wefaxLpm:1,wefaxFrequency:1900,wefaxManual:false,galleryRows:4,galleryColumns:4,savePercent:40,recordAudio:false,recordLimit:100};
 function saved(key,fallback) {try{return JSON.parse(localStorage.getItem('mmsstv.'+key))??fallback;}catch{return fallback;}}
 const state={engine:null,modes:[],settings:{...defaults,...saved('settings',{})},mode:-1,tab:'rx',snapshot:null,pixels:null,width:320,height:256,hasImage:false,history:[],stocks:[],historyIndex:0,stockPage:0,logs:saved('logs',[]),profiles:saved('profiles',{}),input:null,token:0,elapsed:0,paused:false,phase:0,ppm:0,completed:0,serial:0,locked:false,waterfallColor:false,db:null};
 const optionMap={afc:0,lms:1,bpf:2,demodulator:3,sensitivity:4,autoStop:5,autoSync:6,autoSlant:7,differentiator:9,fftGain:10,fskId:11};
-const tx={mode:Number.isInteger(Number(state.settings.txMode))&&Number(state.settings.txMode)>=0&&Number(state.settings.txMode)<46?Number(state.settings.txMode):7,source:null,name:'',fit:state.settings.txFit||'stretch',encoder:null,busy:false,token:0,wave:null,waveName:'',waveUrl:null};
+const tx={mode:Number.isInteger(Number(state.settings.txMode))&&Number(state.settings.txMode)>=0&&Number(state.settings.txMode)<48?Number(state.settings.txMode):7,source:null,name:'',fit:state.settings.txFit||'stretch',encoder:null,busy:false,token:0,wave:null,waveName:'',waveUrl:null};
 const digital={engine:null,encoder:null,protocol:'sstv',snapshot:null,files:[],source:null,picture:null,settings:{mode:2,bandwidth:1,qam:1,protection:0,interleave:0,rs:0,...saved('digital',{})}};
-function notifyView(){$('sample-status').textContent=(digital.protocol==='drm'?12000:11025)+' Hz';window.QSSTVUI?.refresh();}
+function notifyView(){$('sample-status').textContent=(digital.protocol==='drm'?12000:11025)+' Hz';window.QSSTVUI?.refresh();if($('wefax-settings'))$('wefax-settings').hidden=digital.protocol==='drm'||!isWEFAXMode(state.tab==='tx'?tx.mode:state.mode);}
 Object.assign(defaults,{operatorName:'',operatorQth:'',operatorLocator:'',backgroundColor:'#dfe5e6',slowCpu:false,confirmDelete:false,confirmClose:false,lowResolution:false,cwWpm:15,cwFrequency:800,waterfallMax:-25,waterfallRange:35,waterfallAverage:.9});
 state.settings={...defaults,txVox:false,txCw:false,digitalImageSize:640,...state.settings};
 let lastVisual=0, micQueue=Promise.resolve(), pendingMic=0;
@@ -33,14 +33,15 @@ async function applySettings(){
   $('afc').setAttribute('aria-pressed',String(state.settings.afc));$('lms').setAttribute('aria-pressed',String(state.settings.lms));
   $('auto-history').checked=state.settings.autoHistory;$('auto-slant').checked=state.settings.autoSlant;
   $('rx-id').setAttribute('aria-pressed',String(state.settings.fskId));
-  $('tx-id').setAttribute('aria-pressed',String(state.settings.txFskId));
+  $('tx-id').setAttribute('aria-pressed',String(state.settings.txFskId));$('tx-id').disabled=isWEFAXMode(tx.mode);
 }
 async function resetReceiver(mode=state.mode){
   state.mode=mode;state.hasImage=digital.protocol==='drm'&&!!digital.picture;state.phase=0;state.ppm=0;
-  renderSnapshot(await state.engine.call('reset',{mode}),true);await applySettings();updateModeButtons();
+  await state.engine.call('fax-option',{id:1,value:state.settings.wefaxLpm});await state.engine.call('fax-option',{id:5,value:state.settings.wefaxFrequency});await state.engine.call('fax-option',{id:6,value:Number(state.settings.wefaxManual)});renderSnapshot(await state.engine.call('reset',{mode}),true);await applySettings();updateModeButtons();
   if(digital.engine)renderDigital(await digital.engine.call('reset'));
 }
 function updateModeButtons(){
+  $('tx-id').disabled=isWEFAXMode(tx.mode);
   const isTx=state.tab==='tx',selected=isTx?tx.mode:state.mode;
   document.querySelectorAll('[data-mode]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.mode)===selected));b.disabled=digital.protocol==='drm'||isTx && (Number(b.dataset.mode)<0 || tx.busy);});
   $('mode-more')&&($('mode-more').disabled=digital.protocol==='drm'||isTx && tx.busy);
@@ -57,7 +58,7 @@ function selectTab(tab){
 function updateImageButtons(){
   const has=state.tab==='tx'?!!tx.source:state.tab==='history'?state.history.length>0:state.hasImage;
   document.querySelectorAll('.needs-image').forEach(button=>button.disabled=!has);
-  for(const b of document.querySelectorAll('[data-action^=phase-],[data-action^=sync-]'))b.disabled=digital.protocol==='drm'||state.snapshot?.mode===45;
+  for(const b of document.querySelectorAll('[data-action^=phase-],[data-action^=sync-]'))b.disabled=digital.protocol==='drm'||state.snapshot?.mode===45||isWEFAXMode(state.snapshot?.mode);
   if(state.tab==='tx')document.querySelectorAll('[data-action=add-history]').forEach(button=>button.disabled=true);
   document.querySelectorAll('.needs-tx-image').forEach(button=>button.disabled=tx.busy||!(tx.source||button.dataset.action==='generate-wav'&&digital.protocol==='drm'&&digital.source));
 }
@@ -137,11 +138,11 @@ function drawSignal(snapshot){
 function renderSnapshot(snapshot,force=false){
   const previous=state.snapshot;state.snapshot=snapshot;
   if(snapshot.serial!==state.serial){state.serial=snapshot.serial;state.phase=0;state.ppm=0;}
-  if(snapshot.pixels){state.pixels=snapshot.pixels;state.width=snapshot.width;state.height=snapshot.height;if(digital.protocol==='sstv')paint($('rx-picture'),snapshot.pixels,snapshot.width,snapshot.height);paint($('sync-picture'),snapshot.sync,320,256);}
+  if(snapshot.pixels&&(!isWEFAXMode(snapshot.mode)||snapshot.line||force||!state.hasImage)){state.pixels=snapshot.pixels;state.width=snapshot.width;state.height=snapshot.height;if(digital.protocol==='sstv')paint($('rx-picture'),snapshot.pixels,snapshot.width,snapshot.height);if(snapshot.sync)paint($('sync-picture'),snapshot.sync,320,256);else clearCanvas($('sync-picture'));}
   if(digital.protocol==='sstv')state.hasImage=state.hasImage||snapshot.line>0;
   if(snapshot.completed>state.completed){state.completed=snapshot.completed;if(state.settings.autoHistory && snapshot.finished && 100*snapshot.finished.fraction>=state.settings.savePercent)addHistory(false,snapshot.finished);}
   const name=state.modes[snapshot.mode]?.name||'Auto';
-  $('rx-info').textContent=snapshot.receiving?`${name} · ${snapshot.line}`:snapshot.fsk||'Ready';
+  $('rx-info').textContent=isWEFAXMode(snapshot.mode)?`${name} · ${snapshot.faxState===3?'Receiving · '+snapshot.line:snapshot.faxState===2?'Phasing':'Waiting for APT'}`:snapshot.receiving?`${name} · ${snapshot.line}`:snapshot.fsk||'Ready';
   if(state.tab!=='tx')$('mode-status').textContent=digital.protocol==='drm'?'DRM':state.mode<0?(snapshot.receiving?`Auto: ${name}`:'Auto'):state.modes[state.mode]?.name;
   if(snapshot.fsk && snapshot.fsk!==previous?.fsk){$('rx-id').title=`Received FSK ID: ${snapshot.fsk}`;if(state.settings.fskId)$('call').value=snapshot.fsk;}
   if(force || performance.now()-lastVisual>(state.settings.slowCpu?250:80)){drawSignal(snapshot);lastVisual=performance.now();}
@@ -217,8 +218,8 @@ async function runFile(token){
     await new Promise(resolve=>setTimeout(resolve,Math.min(350,Math.max(0,delay))));
   }
   if(token!==state.token)return;
-  renderSnapshot(await state.engine.call('finish'),true);
-  state.input=null;updateInputButtons();$('source-name').textContent=`Finished — ${input.name}`;$('file-progress').value=1;status(digital.protocol==='drm'?input.receivedDigital?'Audio complete — DRM file recovered.':`Audio complete — ${digital.snapshot?.status[11]||0}/${digital.snapshot?.status[12]||0} DRM segments.`:state.hasImage?'Audio file complete. Picture ready to save.':'Audio file complete. No SSTV image detected.');
+  renderSnapshot(await state.engine.call('finish',{automatic:true}),true);
+  state.input=null;updateInputButtons();$('source-name').textContent=`Finished — ${input.name}`;$('file-progress').value=1;status(digital.protocol==='drm'?input.receivedDigital?'Audio complete — DRM file recovered.':`Audio complete — ${digital.snapshot?.status[11]||0}/${digital.snapshot?.status[12]||0} DRM segments.`:state.hasImage?'Audio file complete. Picture ready to save.':'Audio file complete. No image detected.');
 }
 async function startMicrophone(deviceId){
   await stopInput();const token=++state.token;let stream,context;
@@ -322,7 +323,7 @@ function paintTxPicture(canvas){
 }
 function drawTxImage(){
   const mode=state.modes[tx.mode];if(!mode)return;
-  const canvas=$('tx-picture');canvas.width=mode.width;canvas.height=mode.txHeight;if(digital.protocol==='drm'&&tx.source){const scale=Math.min(1,(state.settings.digitalImageSize||640)/Math.max(tx.source.width,tx.source.height));canvas.width=Math.max(2,Math.round(tx.source.width*scale));canvas.height=Math.max(2,Math.round(tx.source.height*scale));}
+  const canvas=$('tx-picture');canvas.width=mode.width;canvas.height=isWEFAXMode(tx.mode)&&tx.source?Math.max(1,Math.min(8192,Math.round(mode.width*tx.source.height/tx.source.width))):mode.txHeight;if(digital.protocol==='drm'&&tx.source){const scale=Math.min(1,(state.settings.digitalImageSize||640)/Math.max(tx.source.width,tx.source.height));canvas.width=Math.max(2,Math.round(tx.source.width*scale));canvas.height=Math.max(2,Math.round(tx.source.height*scale));}
   paintTxPicture(canvas);if(state.settings.useTemplate&&typeof applyTemplate==='function')applyTemplate(canvas);
   $('tx-caption').textContent=tx.source?`${canvas.width}×${canvas.height} ${tx.name}`:'Open a picture to generate SSTV audio';
   updateImageButtons();
@@ -340,14 +341,15 @@ async function setTxImage(source,name='Picture'){
 function generateWavDialog(){
   if(!tx.source || tx.busy)return;
   selectTab('tx');
-  dialog('Generate SSTV audio',`<div class="dialog-body"><fieldset><legend>Picture / mode</legend><div class="form-row"><label for="encode-mode">SSTV mode</label><select id="encode-mode">${state.modes.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('')}</select></div><div class="form-row"><label for="encode-fit">Picture resizing</label><select id="encode-fit"><option value="stretch">Stretch to mode size</option><option value="fit">Fit with white borders</option><option value="crop">Fill and crop</option></select></div><p id="encode-size"></p></fieldset><fieldset><legend>Identification</legend><label><input id="encode-id" type="checkbox">Include FSK callsign</label><label><input id="encode-vox" type="checkbox">VOX lead-in tone</label><label><input id="encode-cw" type="checkbox">Append CW ID</label><div class="form-row"><label for="encode-call">My callsign</label><input id="encode-call" maxlength="18" value="${escapeHtml(state.settings.myCall)}"></div></fieldset><p>Generate a mono, 16-bit PCM WAV at 11025 Hz.</p></div>`,'<button id="encode-start">Generate</button><button data-dialog="close">Cancel</button>');
+  dialog('Generate image audio',`<div class="dialog-body"><fieldset><legend>Picture / mode</legend><div class="form-row"><label for="encode-mode">Image mode</label><select id="encode-mode">${state.modes.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('')}</select></div><div class="form-row"><label for="encode-fit">Picture resizing</label><select id="encode-fit"><option value="stretch">Stretch to mode size</option><option value="fit">Fit with white borders</option><option value="crop">Fill and crop</option></select></div><p id="encode-size"></p><div id="encode-fax-options" hidden class="form-row"><label for="encode-lpm">WEFAX lines/min</label><select id="encode-lpm"><option value="0">240</option><option value="1">120</option><option value="2">90</option><option value="3">60</option></select></div></fieldset><fieldset><legend>Identification</legend><label><input id="encode-id" type="checkbox">Include FSK callsign</label><label><input id="encode-vox" type="checkbox">VOX lead-in tone</label><label><input id="encode-cw" type="checkbox">Append CW ID</label><div class="form-row"><label for="encode-call">My callsign</label><input id="encode-call" maxlength="18" value="${escapeHtml(state.settings.myCall)}"></div></fieldset><p>Generate a mono, 16-bit PCM WAV at 11025 Hz.</p></div>`,'<button id="encode-start">Generate</button><button data-dialog="close">Cancel</button>');
   $('encode-mode').value=tx.mode;$('encode-fit').value=tx.fit;$('encode-id').checked=state.settings.txFskId;$('encode-vox').checked=state.settings.txVox;$('encode-cw').checked=state.settings.txCw;
-  const describe=()=>{const mode=state.modes[Number($('encode-mode').value)];$('encode-size').textContent=`${mode.width} × ${mode.txHeight} pixels`;};
+  $('encode-lpm').value=state.settings.wefaxLpm;
+  const describe=()=>{const mode=state.modes[Number($('encode-mode').value)],fax=isWEFAXMode(mode.id);$('encode-size').textContent=fax?`${mode.width} pixels wide · height follows picture aspect ratio · grayscale`:`${mode.width} × ${mode.txHeight} pixels`;$('encode-fax-options').hidden=!fax;$('encode-id').disabled=fax;if(fax)$('encode-id').checked=false;};
   $('encode-mode').onchange=describe;describe();
   $('encode-start').onclick=()=>{
     const call=$('encode-call').value.trim().toUpperCase(),include=$('encode-id').checked;
     if(include && !/^[A-Z0-9 /-]{1,18}$/.test(call)){status('Enter a callsign using letters, digits, spaces, / or -.',true);$('encode-call').focus();return;}
-    tx.fit=$('encode-fit').value;setTxMode(Number($('encode-mode').value));
+    state.settings.wefaxLpm=Number($('encode-lpm').value);tx.fit=$('encode-fit').value;setTxMode(Number($('encode-mode').value));
     state.settings.txVox=$('encode-vox').checked;state.settings.txCw=$('encode-cw').checked;state.settings.txFskId=include;if(call)state.settings.myCall=call;persist('settings',state.settings);$('tx-id').setAttribute('aria-pressed',String(include));
     generateWav(include?call:'').catch(failure);
   };
@@ -356,12 +358,12 @@ async function generateWav(call){
   tx.busy=true;const token=++tx.token,mode=state.modes[tx.mode],canvas=$('tx-picture');
   const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
   updateImageButtons();updateModeButtons();
-  dialog('Generate SSTV audio',`<div class="dialog-body"><p>${escapeHtml(mode.name)} · ${canvas.width} × ${canvas.height} pixels</p><progress id="encode-progress" max="1" value="0" aria-label="SSTV audio generation progress"></progress><p id="encode-status">Preparing audio encoder…</p></div>`,'<button data-dialog="close">Cancel</button>');
+  dialog('Generate image audio',`<div class="dialog-body"><p>${escapeHtml(mode.name)} · ${canvas.width} × ${canvas.height} pixels</p><progress id="encode-progress" max="1" value="0" aria-label="image audio generation progress"></progress><p id="encode-status">Preparing audio encoder…</p></div>`,'<button data-dialog="close">Cancel</button>');
   const cancel=()=>{if(token===tx.token)++tx.token;};$('modal').addEventListener('close',cancel);
   try{
-    if(!tx.encoder)tx.encoder=await MMSEncoderEngine.create();
+    if(!tx.encoder)tx.encoder=await MMSSharedEncoder.create();
     if(token!==tx.token)return;
-    await tx.encoder.call('start',{mode:mode.id,width:canvas.width,height:canvas.height,pixels:new Uint8Array(pixels),call});
+    await tx.encoder.call('start',{mode:mode.id,width:canvas.width,height:canvas.height,pixels:new Uint8Array(pixels),call,lpm:state.settings.wefaxLpm});
     const chunks=[];let count=0,block;
     do{
       if(token!==tx.token)return;
@@ -373,26 +375,35 @@ async function generateWav(call){
     tx.wave=await finishGeneratedAudio(chunks,11025);count=(tx.wave.size-44)/2;tx.waveName=mode.name.replace(/[^a-z0-9-]/gi,'_')+'_'+timestamp()+'.wav';
     if(tx.waveUrl)URL.revokeObjectURL(tx.waveUrl);tx.waveUrl=URL.createObjectURL(tx.wave);
     $('modal').removeEventListener('close',cancel);
-    dialog('Save SSTV audio',`<div class="dialog-body"><p><b>${escapeHtml(mode.name)}</b> · ${canvas.width} × ${canvas.height} pixels</p><p>${duration(count/11025)} · 11025 Hz · 16-bit mono · ${(tx.wave.size/1024/1024).toFixed(2)} MB</p><div class="form-row"><label for="wave-name">File name</label><input id="wave-name" value="${escapeHtml(tx.waveName)}"></div></div>`,'<a class="dialog-button" id="wave-download" download>Save WAV</a><button id="wave-decode">Decode WAV</button><button data-dialog="close">Close</button>');
+    dialog('Save image audio',`<div class="dialog-body"><p><b>${escapeHtml(mode.name)}</b> · ${canvas.width} × ${canvas.height} pixels</p><p>${duration(count/11025)} · 11025 Hz · 16-bit mono · ${(tx.wave.size/1024/1024).toFixed(2)} MB</p><div class="form-row"><label for="wave-name">File name</label><input id="wave-name" value="${escapeHtml(tx.waveName)}"></div></div>`,'<a class="dialog-button" id="wave-download" download>Save WAV</a><button id="wave-decode">Decode WAV</button><button data-dialog="close">Close</button>');
     const link=$('wave-download');link.href=tx.waveUrl;link.download=tx.waveName;
     $('wave-name').oninput=()=>{const name=$('wave-name').value.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')||tx.waveName;link.download=/\.wav$/i.test(name)?name:name+'.wav';};
-    link.onclick=()=>status('SSTV WAV download requested.');
-    $('wave-decode').onclick=async()=>{try{$('modal').close();setProtocol('sstv');selectTab('rx');await stopInput();await resetReceiver(mode.id===45?45:-1);await loadAudio(new File([tx.wave],link.download,{type:'audio/wav'}));}catch(error){failure(error);}};
-    status('SSTV audio generated — Save WAV to download the file.');
-  }catch(error){if(token===tx.token){$('modal').removeEventListener('close',cancel);dialog('SSTV audio generation failed',`<div class="dialog-body"><p>${escapeHtml(error.message)}</p></div>`);throw error;}}
+    link.onclick=()=>status('Image WAV download requested.');
+    $('wave-decode').onclick=async()=>{try{$('modal').close();setProtocol('sstv');selectTab('rx');await stopInput();await resetReceiver(mode.id===45||isWEFAXMode(mode.id)?mode.id:-1);await loadAudio(new File([tx.wave],link.download,{type:'audio/wav'}));}catch(error){failure(error);}};
+    status('image audio generated — Save WAV to download the file.');
+  }catch(error){if(token===tx.token){$('modal').removeEventListener('close',cancel);dialog('image audio generation failed',`<div class="dialog-body"><p>${escapeHtml(error.message)}</p></div>`);throw error;}}
   finally{
     $('modal').removeEventListener('close',cancel);
     try{await tx.encoder?.call('cancel');}catch(error){tx.encoder?.worker?.terminate();tx.encoder=null;console.warn('Audio encoder was reset.',error);}
     tx.busy=false;updateImageButtons();updateModeButtons();
-    if(token!==tx.token)status('SSTV audio generation canceled.');
+    if(token!==tx.token)status('image audio generation canceled.');
   }
+}
+
+function wefaxSettingsDialog(){
+  dialog('WEFAX settings',`<div class="dialog-body"><div class="form-row"><label for="fax-lpm">Lines per minute</label><select id="fax-lpm"><option value="0">240</option><option value="1">120</option><option value="2">90</option><option value="3">60</option></select></div><div class="form-row"><label for="fax-frequency">Receive carrier (Hz)</label><input id="fax-frequency" type="number" min="1500" max="2300" step="1" value="${state.settings.wefaxFrequency}"></div><label><input id="fax-manual" type="checkbox">Recording starts in the image (skip APT and phasing)</label><p>TX uses the standard 1900 Hz carrier. Select the IOC mode before loading audio. For a recording without its start sequence, skip APT, then skip phasing.</p><div class="button-row"><button id="fax-apt">Skip APT</button><button id="fax-phasing">Skip phasing</button><button id="fax-end">End page</button></div></div>`);
+  $('fax-manual').checked=state.settings.wefaxManual;$('fax-manual').onchange=async()=>{state.settings.wefaxManual=$('fax-manual').checked;persist('settings',state.settings);const result=await state.engine.call('fax-option',{id:6,value:Number(state.settings.wefaxManual)});if(result.mode!==undefined)renderSnapshot(result,true);};
+  $('fax-lpm').value=state.settings.wefaxLpm;
+  $('fax-lpm').onchange=async()=>{state.settings.wefaxLpm=Number($('fax-lpm').value);persist('settings',state.settings);await state.engine.call('fax-option',{id:1,value:state.settings.wefaxLpm});};
+  $('fax-frequency').onchange=async()=>{const value=Number($('fax-frequency').value);if(!Number.isFinite(value)||value<1500||value>2300){$('fax-frequency').value=state.settings.wefaxFrequency;return;}state.settings.wefaxFrequency=value;persist('settings',state.settings);await state.engine.call('fax-option',{id:5,value});};
+  for(const [name,id]of [['apt',2],['phasing',3],['end',4]]){$('fax-'+name).disabled=state.tab==='tx'||!isWEFAXMode(state.mode);$('fax-'+name).onclick=async()=>{try{renderSnapshot(await state.engine.call('fax-option',{id,value:1}),true);}catch(error){failure(error);}};}
 }
 
 function moreModesDialog(){
   const isTx=state.tab==='tx';
   dialog(isTx?'TX Mode':'RX Mode',`<div class="dialog-body"><fieldset><legend>SSTV mode</legend><select id="all-modes" size="12" style="height:250px;width:100%"></select></fieldset><p id="mode-size"></p></div>`,'<button id="mode-select">Select</button><button data-dialog="close">Cancel</button>');
   if(!isTx)$('all-modes').add(new Option('Auto',-1));for(const mode of state.modes)$('all-modes').add(new Option(mode.name,mode.id));$('all-modes').value=isTx?tx.mode:state.mode;
-  const describe=()=>{const mode=state.modes[Number($('all-modes').value)];$('mode-size').textContent=mode?`${mode.width} × ${isTx?mode.txHeight:mode.height} pixels`:'Automatic VIS and sync detection (FAX480 requires manual selection)';};$('all-modes').onchange=describe;describe();
+  const describe=()=>{const mode=state.modes[Number($('all-modes').value)];$('mode-size').textContent=mode?(isWEFAXMode(mode.id)?`${mode.width} pixels wide · grayscale weather fax · select before opening audio`:`${mode.width} × ${isTx?mode.txHeight:mode.height} pixels`):'Automatic VIS and sync detection (FAX480 and WEFAX require manual selection)';};$('all-modes').onchange=describe;describe();
   $('mode-select').onclick=()=>{const mode=Number($('all-modes').value);$('modal').close();if(isTx)setTxMode(mode);else resetReceiver(mode).catch(failure);};$('all-modes').ondblclick=()=>$('mode-select').click();
 }
 function logFields(){return {call:$('call').value.trim().toUpperCase(),name:$('name').value,qth:$('qth').value,note:$('note').value,qsl:$('qsl').value,his:$('his-rst').value,my:$('my-rst').value,frequency:$('frequency').value,mode:digital.protocol==='drm'?'DRM':state.modes[state.snapshot?.mode]?.name||'SSTV',time:new Date().toISOString()};}
@@ -405,7 +416,7 @@ function exportLogDialog(){
     const format=$('log-format').value;let content;
     if(format==='json')content=JSON.stringify(state.logs,null,2);
     else if(format==='csv'){const keys=['time','call','name','qth','his','my','frequency','mode','note','qsl'];const cell=v=>'"'+String(v??'').replaceAll('"','""')+'"';content=keys.join(',')+'\r\n'+state.logs.map(row=>keys.map(k=>cell(row[k])).join(',')).join('\r\n');}
-    else{const field=(key,value)=>value?`<${key}:${String(value).length}>${value}`:'';content='MMSSTV web\n<ADIF_VER:5>3.1.4 <PROGRAMID:10>MMSSTV web <EOH>\n'+state.logs.map(r=>field('CALL',r.call)+field('QSO_DATE',r.time.slice(0,10).replaceAll('-',''))+field('TIME_ON',r.time.slice(11,19).replaceAll(':',''))+field('MODE',r.mode==='FAX480'?'FAX':'SSTV')+field('APP_MMSSTV_WEB_MODE',r.mode)+field('FREQ',r.frequency)+field('RST_RCVD',r.his)+field('RST_SENT',r.my)+field('NAME',r.name)+field('QTH',r.qth)+field('COMMENT',r.note)+field('STATION_CALLSIGN',state.settings.myCall)+'<EOR>').join('\n');}
+    else{const field=(key,value)=>value?`<${key}:${String(value).length}>${value}`:'';content='MMSSTV web\n<ADIF_VER:5>3.1.4 <PROGRAMID:10>MMSSTV web <EOH>\n'+state.logs.map(r=>field('CALL',r.call)+field('QSO_DATE',r.time.slice(0,10).replaceAll('-',''))+field('TIME_ON',r.time.slice(11,19).replaceAll(':',''))+field('MODE',r.mode==='FAX480'||r.mode.startsWith('WEFAX')?'FAX':'SSTV')+field('APP_MMSSTV_WEB_MODE',r.mode)+field('FREQ',r.frequency)+field('RST_RCVD',r.his)+field('RST_SENT',r.my)+field('NAME',r.name)+field('QTH',r.qth)+field('COMMENT',r.note)+field('STATION_CALLSIGN',state.settings.myCall)+'<EOR>').join('\n');}
     download(new Blob([content],{type:format==='json'?'application/json':format==='csv'?'text/csv':'text/plain'}),'MMSSTV-log-'+timestamp()+'.'+format);$('modal').close();status('Log data saved.');
   };
 }
@@ -413,15 +424,15 @@ function logSettingsDialog(){
   dialog('Setup logging',`<div class="dialog-body"><fieldset><legend>Station</legend><div class="form-row"><label for="my-call">My callsign</label><input id="my-call" maxlength="30" value="${escapeHtml(state.settings.myCall)}"></div></fieldset><fieldset disabled><legend>External log link</legend><label><input type="checkbox" disabled>Link to MMLOG / HAMLOG</label></fieldset><p>Log entries are saved in this browser. Use Save log data to download ADIF, CSV, or JSON.</p></div>`,'<button id="log-settings-ok">OK</button><button data-dialog="close">Cancel</button>');$('log-settings-ok').onclick=()=>{state.settings.myCall=$('my-call').value.trim().toUpperCase();persist('settings',state.settings);$('modal').close();};
 }
 function about(){
-  dialog('About MMSSTV',`<div class="dialog-body"><p><img src="assets/mmsstv.ico" width="32" height="32" alt="MMSSTV" style="float:left;margin-right:10px"><b>MMSSTV Ver 1.13A — Web</b><br>Original program by JE3HHT Makoto Mori<br>English translation by JA7UDE Nobuyuki Oba</p><hr><p>Original MMSSTV receiver and audio encoder plus the QSSTV HAMDRM modem compiled to WebAssembly. 46 analog modes and DRM A/B/E with 4/16/64-QAM and optional Reed–Solomon protection. Audio and pictures are processed locally in your browser.</p><p>Switchable MMSSTV and QSSTV interfaces share microphone/audio files, images, templates, history, settings and logs. Generate SSTV or DRM WAV files and download decoded digital files. Radio control and PTT are disabled.</p><p>Combined browser application: GNU General Public License, version 3 or later. The independent MMSSTV core retains LGPL-3.0-or-later terms.</p><div class="link-row"><a href="COPYING.txt" target="_blank" rel="noopener">License</a><a href="THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Notices</a><a href="https://github.com/crashdemons-external/mmsstv-web" target="_blank" rel="noopener">Source code</a></div></div>`);
+  dialog('About MMSSTV',`<div class="dialog-body"><p><img src="assets/mmsstv.ico" width="32" height="32" alt="MMSSTV" style="float:left;margin-right:10px"><b>MMSSTV Ver 1.13A — Web</b><br>Original program by JE3HHT Makoto Mori<br>English translation by JA7UDE Nobuyuki Oba</p><hr><p>Original MMSSTV receiver and audio encoder plus the fldigi WEFAX and QSSTV HAMDRM modems compiled to WebAssembly. 46 analog modes, WEFAX IOC576/288 and DRM A/B/E with 4/16/64-QAM and optional Reed–Solomon protection. Audio and pictures are processed locally in your browser.</p><p>Switchable MMSSTV and QSSTV interfaces share microphone/audio files, images, templates, history, settings and logs. Generate SSTV or DRM WAV files and download decoded digital files. Radio control and PTT are disabled.</p><p>Combined browser application: GNU General Public License, version 3 or later. The independent MMSSTV core retains LGPL-3.0-or-later terms.</p><div class="link-row"><a href="COPYING.txt" target="_blank" rel="noopener">License</a><a href="THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Notices</a><a href="https://github.com/crashdemons-external/mmsstv-web" target="_blank" rel="noopener">Source code</a></div></div>`);
 }
 function help(){
-  dialog('MMSSTV web help',`<div class="dialog-body"><p><b>Receiving SSTV</b></p><p>Select Auto for automatic mode detection, then use Mic or Open audio. PCM WAV and MMSSTV MMV are supported directly; other formats use your browser's audio codecs. Select a specific RX mode to start reception manually.</p><p><b>Picture and history</b></p><p>Images appear progressively on the RX tab. Auto history saves received pictures in this browser. Select History or a stock thumbnail to view them. Save exports the full resolution as PNG, JPEG, or BMP.</p><p><b>Generate SSTV audio</b></p><p>Select TX, then Open to load a picture. Choose a TX mode and Generate WAV. Set the resizing method and optional FSK callsign, then Generate and Save WAV. Decode WAV feeds the generated recording into the receiver. The disabled TX and Tune buttons represent live sound/radio output.</p><p><b>Sync</b></p><p>The Sync tab shows the demodulated sync signal. Phase / Slant redraws the retained received signal. ReSync restarts in the current mode. Lock prevents automatic receiver restart and mode changes.</p><p><b>Sound files</b></p><p>Use View → Adjust play position to seek or pause a recording. Fast decode is the default; choose real time or 8× in Option → Setup MMSSTV → Misc. Audio is fed to the receiver without speaker playback.</p><p><b>DRM / digital files</b></p><p>Choose DRM in either interface. Open a digital file or a TX image, then Generate DRM WAV. Receive DRM images and binary files from uploaded audio or the microphone. Received files, BSR requests and FIX retransmission are available in File/DRM controls. Configuration shares operator, gallery, sound, waterfall and DRM settings. The template editor adds text with callsign and QSO substitutions.</p><p><b>Browser access</b></p><p>Serve web/ over HTTP(S), then open index.html. Microphone and camera access require localhost or HTTPS. Nothing is uploaded to a server. Disabled controls identify features not available in this port.</p></div>`);
+  dialog('MMSSTV web help',`<div class="dialog-body"><p><b>Receiving SSTV</b></p><p>Select Auto for automatic mode detection, then use Mic or Open audio. PCM WAV and MMSSTV MMV are supported directly; other formats use your browser's audio codecs. Select a specific RX mode to start reception manually.</p><p><b>Picture and history</b></p><p>Images appear progressively on the RX tab. Auto history saves received pictures in this browser. Select History or a stock thumbnail to view them. Save exports the full resolution as PNG, JPEG, or BMP.</p><p><b>Generate SSTV audio</b></p><p>Select TX, then Open to load a picture. Choose a TX mode and Generate WAV. Set the resizing method and optional FSK callsign, then Generate and Save WAV. Decode WAV feeds the generated recording into the receiver. The disabled TX and Tune buttons represent live sound/radio output.</p><p><b>WEFAX</b></p><p>Select WEFAX IOC576 or IOC288 under More modes before opening audio. Use WEFAX settings for line speed and carrier. Enable Recording starts in the image before opening recordings without APT/phasing; manual reception continues until Stop. For paused recordings, Skip APT / Skip phasing also starts the current page. TX uses grayscale, the IOC width and the picture aspect ratio; choose line speed when generating WAV. Reception grows as lines arrive. Stop or end of audio saves the partial page to history when Auto history is enabled. WEFAX requires manual mode selection; Auto detects SSTV.</p><p><b>Sync</b></p><p>The Sync tab shows the demodulated sync signal. Phase / Slant redraws the retained received signal. ReSync restarts in the current mode. Lock prevents automatic receiver restart and mode changes.</p><p><b>Sound files</b></p><p>Use View → Adjust play position to seek or pause a recording. Fast decode is the default; choose real time or 8× in Option → Setup MMSSTV → Misc. Audio is fed to the receiver without speaker playback.</p><p><b>DRM / digital files</b></p><p>Choose DRM in either interface. Open a digital file or a TX image, then Generate DRM WAV. Receive DRM images and binary files from uploaded audio or the microphone. Received files, BSR requests and FIX retransmission are available in File/DRM controls. Configuration shares operator, gallery, sound, waterfall and DRM settings. The template editor adds text with callsign and QSO substitutions.</p><p><b>Browser access</b></p><p>Serve web/ over HTTP(S), then open index.html. Microphone and camera access require localhost or HTTPS. Nothing is uploaded to a server. Disabled controls identify features not available in this port.</p></div>`);
 }
 
 const actions={
   'open-audio':()=>$('audio-file').click(),microphone:microphoneDialog,stop:()=>stopInput(),pause:()=>{state.paused=!state.paused;updateInputButtons();status(state.paused?'Sound file paused.':'Playing sound file…');},
-  'tx-open':()=>{if(tx.busy)return;selectTab('tx');$('tx-image-file').click();},'generate-wav':generateWavDialog,
+  'wefax-settings':wefaxSettingsDialog,'tx-open':()=>{if(tx.busy)return;selectTab('tx');$('tx-image-file').click();},'generate-wav':generateWavDialog,
   'copy-to-tx':()=>setTxImage(currentCanvas(),imageName()),'view-tx':()=>selectTab('tx'),
   'save-image':saveImageDialog,'add-history':()=>{addHistory(true);status('Picture copied to history.');},zoom:()=>zoomImage(),
   'copy-image':async()=>{const canvas=currentCanvas();if(navigator.clipboard?.write && globalThis.ClipboardItem){try{const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);status('Picture copied to clipboard.');return;}catch{}}saveImageDialog();},
@@ -482,10 +493,11 @@ window.addEventListener('pagehide',()=>{state.input?.stream?.getTracks().forEach
 (async function initialize(){
   clearCanvas($('rx-picture'));clearCanvas($('sync-picture'));clearCanvas($('history-picture'));clearCanvas($('tx-picture'));clearCanvas($('waterfall'),'#000');drawScale();renderStock();renderProfiles();openDatabase();
   try{
-    state.engine=await MMSDecoderEngine.create();state.modes=state.engine.modes;
+    state.engine=await MMSSharedDecoder.create();state.modes=state.engine.modes;
     try{digital.engine=await QSSTVDigitalEngine.create();}catch(error){console.warn('Digital modem unavailable.',error);}
     const favorites=[-1,0,1,2,3,4,5,6,7,9];
     for(const id of favorites){const button=document.createElement('button');button.textContent=id<0?'Auto':state.modes[id].name;button.dataset.mode=id;button.setAttribute('aria-pressed',String(id===-1));$('rx-modes').append(button);}
+    const faxSettings=document.createElement('button');faxSettings.id='wefax-settings';faxSettings.textContent='WEFAX settings…';faxSettings.dataset.action='wefax-settings';faxSettings.hidden=true;$('rx-modes').append(faxSettings);
     const more=document.createElement('button');more.id='mode-more';more.textContent='More modes…';more.onclick=moreModesDialog;$('rx-modes').append(more);
     await applySettings();renderSnapshot(await state.engine.call('snapshot'),true);
     drawTxImage();updateModeButtons();

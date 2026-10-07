@@ -12,6 +12,7 @@ from version_assets import version_assets
 from prepare_assets import prepare as prepare_assets
 from build_qsstv import build as build_qsstv
 from build_jpeg2000 import build as build_jpeg2000
+from build_wefax import build as build_wefax
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -57,11 +58,12 @@ def main():
     subprocess.run(command + flags + [str(p) for p in files] + ['-o', str(ROOT / 'web/mmsstv-core.js')], env=env, check=True, cwd=ROOT)
     build_qsstv(command,env,args.debug)
     build_jpeg2000(command,env,args.debug)
-    for name in ['mmsstv-core.js','qsstv-core.js','jpeg2000-core.js']:
+    build_wefax(command,env,args.debug)
+    for name in ['mmsstv-core.js','qsstv-core.js','jpeg2000-core.js','wefax-core.js']:
         path=ROOT/'web'/name
         path.write_text(path.read_text(encoding='utf-8').rstrip()+'\n',encoding='utf-8')
     version = subprocess.check_output(command + ['--version'], env=env, text=True).splitlines()[0]
-    info = {'upstream': 'MMSSTV 1.13A + QSSTV AVT24/94 and FAX480', 'compiler': version, 'modeCount': 46,
+    info = {'upstream': 'MMSSTV 1.13A + QSSTV AVT24/94 and FAX480 + fldigi 4.2.13 WEFAX', 'compiler': version, 'modeCount': 46, 'imageModeCount': 48,
             'sources': json.loads((ROOT / 'build/generated/source-hashes.json').read_text()),
             'coreSha256': hashlib.sha256((ROOT / 'web/mmsstv-core.js').read_bytes()).hexdigest(),
             'wasmSha256': hashlib.sha256((ROOT / 'web/mmsstv-core.wasm').read_bytes()).hexdigest()}
@@ -70,6 +72,10 @@ def main():
                    'wasmSha256':hashlib.sha256((ROOT/'web/qsstv-core.wasm').read_bytes()).hexdigest()}
     info['openjpeg']={'version':'2.5.4','coreSha256':hashlib.sha256((ROOT/'web/jpeg2000-core.js').read_bytes()).hexdigest(),'wasmSha256':hashlib.sha256((ROOT/'web/jpeg2000-core.wasm').read_bytes()).hexdigest()}
     info['assetVersion']=version_assets()
+    info['wefax']={'version':'fldigi 4.2.13','modes':['IOC576','IOC288'],
+                   'sources':json.loads((ROOT/'docs/fldigi-wefax-upstream.json').read_text()),
+                   'coreSha256':hashlib.sha256((ROOT/'web/wefax-core.js').read_bytes()).hexdigest(),
+                   'wasmSha256':hashlib.sha256((ROOT/'web/wefax-core.wasm').read_bytes()).hexdigest()}
     (ROOT / 'web/build-info.json').write_text(json.dumps(info, indent=2) + '\n')
     licenses = ROOT / 'web/licenses'
     licenses.mkdir(exist_ok=True)

@@ -30,6 +30,9 @@ runtime package dependencies.
   other formats when supported by the browser's Web Audio decoder.
 - 46 analog modes: the original 43 plus AVT24, AVT94 and FAX480; automatic VIS / sync detection, manual mode
   start, AFC, LMS, selectable BPF and demodulator, and optional received FSK ID.
+- WEFAX IOC576/IOC288 reception and grayscale WAV generation through fldigi,
+  with four line speeds, APT/phasing and manual reception of partial recordings.
+  Selectable from the existing RX/TX mode lists in both interfaces.
 - Progressive RX picture, original FFT spectrum, waterfall and Sync display.
 - Phase/slant redraw from retained demodulated signal; automatic sync/stop/slant.
 - History and stock pictures stored locally using IndexedDB. Session history
@@ -56,7 +59,9 @@ Hardware control, PTT and live radio/speaker output are disabled. Native FTP
 and QSSTV's FTP-based hybrid server/“Who is on” features are grayed out because
 browsers do not expose FTP sockets. DRM and offline digital transmission work.
 FAX480 has no VIS and requires selecting it manually before opening a recording;
-phase/slant redraw applies to the original analog modes. Original desktop
+WEFAX also requires selecting its IOC mode before opening audio; use WEFAX settings
+for recordings without an APT/phasing preamble. Phase/slant redraw applies to the
+original analog modes. Original desktop
 configuration/history/template binary formats are not imported; browser JSON
 backups/templates are supported. See [the capability notes](docs/qsstv-port.md).
 
@@ -109,15 +114,15 @@ python scripts/build.py --debug --emsdk D:\path\to\emsdk
 
 The compiler emits `web/mmsstv-core.js` (JavaScript loader) and
 `web/mmsstv-core.wasm` (WebAssembly binary), plus corresponding
-`qsstv-core` and `jpeg2000-core` loader/binary pairs. Deploy all of `web/`;
+`qsstv-core`, `jpeg2000-core` and `wefax-core` loader/binary pairs. Deploy all of `web/`;
 configure the server to serve `.wasm` as `application/wasm`. The supplied
 preview server handles this automatically. Decoding and encoding use workers
 for DSP and JPEG 2000. MMSSTV also supports a main-thread fallback. Direct `file://` opening is no
 longer supported because browsers restrict loading the separate binary.
 
 `scripts/prepare_core.py` creates portable copies under `build/generated/`.
-**`mmsstv-src/`, `qsstv-src/` and `third_party/openjpeg/` remain unchanged.**
-QSSTV and OpenJPEG source provenance and file hashes are recorded in `docs/`. See [docs/porting.md](docs/porting.md) for the
+**`mmsstv-src/`, `qsstv-src/`, `third_party/openjpeg/` and `third_party/fldigi/` remain unchanged.**
+QSSTV, OpenJPEG and fldigi source provenance and file hashes are recorded in `docs/`. See [docs/porting.md](docs/porting.md) for the
 platform boundary and compatibility changes. `scripts/prepare_assets.py`
 converts original bitmaps using Python's standard library. License notices
 are included in `web/`. The About dialog links to the
@@ -138,7 +143,9 @@ Tests initialize all 46 analog modes; verify complete color-image round trips
 for Martin 2, Scottie 1, Robot 36, PD120, AVT90, AVT24 and AVT94; and verify
 FAX480 grayscale reception. The digital suite recovers exact bytes and callsigns
 in all 72 profiles, exercises RS1–RS4, missing-segment recovery, BSR and FIX,
-retained transfers, and input bounds. Image tests cover JPEG 2000 lossless/lossy
+retained transfers, and input bounds. WEFAX tests cover both IOC widths at all four line speeds, decoded grayscale,
+manual reception, growing images, cancellation and switching to/from SSTV.
+See [the WEFAX port notes](docs/wefax-port.md). Image tests cover JPEG 2000 lossless/lossy
 round trips and malformed files. Audio tests cover resampling, channel routing,
 MMV/WAV, BMP, tones and Morse timing/silence.
 

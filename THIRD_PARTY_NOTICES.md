@@ -47,3 +47,12 @@ LGPL-3.0-or-later terms. OpenJPEG retains BSD-2-Clause terms. Runtime JavaScript
 loaders and WebAssembly binaries are distributed as separate files. No FFTW
 library is linked: the browser boundary supplies its own small FFT-compatible
 implementation for the original modem's calls.
+
+
+Fldigi 4.2.13 WEFAX DSP: David Freese, W1HKJ, Remi Chateauneu and the
+contributors credited in the selected original files under `third_party/fldigi/`.
+Fldigi files are GPL-3.0-or-later; WEFAX includes HAMFAX code under
+GPL-2.0-or-later; `gfft.h` is LGPL-3.0-or-later. Original source headers
+and license notices are preserved. See `licenses/Fldigi-COPYING.txt`.
+The browser boundary and streaming transmit adaptation originate in fldigi-web.
+No fldigi UI, device backend, package installation or runtime dependency is used.
