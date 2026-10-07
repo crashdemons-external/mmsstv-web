@@ -106,6 +106,27 @@ def prepare():
         text = (UPSTREAM/name).read_text(encoding='utf-8')
         if name == 'wefax/wefax.cxx':
             text = stream_fax(isolate_receive_state(text)).replace('#include "wefax-pic.h"', '#include "web_wefax.h"')
+            # Auto needs protocol evidence, not the desktop spectrum heuristics
+            # which also enter image state on unrelated tones or noise.
+            text = text.replace('fax_state m_rx_state ;', 'int m_web_detected=0;\n\tfax_state m_rx_state ;')
+            apt = '\t\t\t\tskip_apt_rx();\n\t\t\t\tPUT_STATUS(state_rx_str() << ", " << _("frequency")'
+            if text.count(apt)!=1: raise RuntimeError('Changed WEFAX APT confirmation')
+            text = text.replace(apt, '\t\t\t\tskip_apt_rx();\n\t\t\t\tm_web_detected=1;\n\t\t\t\tPUT_STATUS(state_rx_str() << ", " << _("frequency")')
+            text = text.replace('skip_apt_rx();\n\t\t\t\t\tLOG_VERBOSE("Start, start:', 'skip_apt_rx();\n\t\t\t\t\tm_web_detected=1;\n\t\t\t\t\tLOG_VERBOSE("Start, start:')
+            text = text.replace('++m_phase_lines;', '++m_phase_lines;\n\t\t\tif(m_web_detected && m_phase_lines>=4)m_web_detected=2;')
+            text = text.replace('if (m_phase_lines >= 4 /* Was 4 */) {', '''if (m_phase_lines >= 4 /* Was 4 */) {
+                if(web_fax_auto && m_web_detected==2) {
+                    const double measured=m_lpm_sum_rx/m_phase_lines;
+                    int best=0;
+                    for(int speed=1;speed<4;speed++)
+                        if(std::abs(measured-all_lpm_values[speed].m_value)<std::abs(measured-all_lpm_values[best].m_value))best=speed;
+                    if(std::abs(measured-all_lpm_values[best].m_value)<all_lpm_values[best].m_value*.08)
+                        progdefaults.wefax_lpm_576=progdefaults.wefax_lpm_288=best;
+                }''')
+            # 240 LPM has a 0.25-second phasing period. Desktop's 0.4-second
+            # minimum prevents its advertised fast mode from acquiring phasing.
+            text = text.replace('m_curr_phase_len >= 0.4 * m_sample_rate', 'm_curr_phase_len >= (web_fax_auto && m_web_detected && m_rx_state==RXPHASING ? 0.2 : 0.4) * m_sample_rate')
+            text = text.replace('void fax_implementation::end_rx(void)\n{', 'void fax_implementation::end_rx(void)\n{\n\tm_web_detected=0;')
             # The selected browser line speed also drives native correlation/AFC
             # estimates, which otherwise retain the constructor's old setting.
             text = text.replace('m_lpm_img = all_lpm_values[index].m_value;;', 'm_lpm_img = all_lpm_values[index].m_value;\n\t\tm_default_lpm = m_lpm_img;')
@@ -124,13 +145,14 @@ def prepare():
             start = text.index(marker); brace = text.index('{', start)
             text = text[:brace+1]+'\n\tweb_fax_complete();'+text[brace+1:]
             # Expose the native receive state without translating display text.
-            text = text.replace('std::string state_string(void) const {', 'int web_rx_state() const { return m_rx_state; }\n\tstd::string state_string(void) const {')
+            text = text.replace('std::string state_string(void) const {', 'int web_rx_detected() const { return m_web_detected; }\n\tint web_rx_state() const { return m_rx_state; }\n\tstd::string state_string(void) const {')
             text += '\nint wefax::web_rx_state() const { return m_impl->web_rx_state(); }\n'
+            text += '\nint wefax::web_rx_detected() const { return m_impl->web_rx_detected(); }\n'
         combined += text
         includes.update(re.findall(r'^#include "([^"\n]+)"', text, re.M))
         (GENERATED/Path(name).name).write_text(text, encoding='utf-8')
     header=inc/'wefax.h'
-    header.write_text(header.read_text(encoding='utf-8').replace('std::string state_string(void) const;', 'int web_rx_state() const;\n\tstd::string state_string(void) const;'), encoding='utf-8')
+    header.write_text(header.read_text(encoding='utf-8').replace('std::string state_string(void) const;', 'int web_rx_detected() const;\n\tint web_rx_state() const;\n\tstd::string state_string(void) const;'), encoding='utf-8')
     for name in includes:
         if name in HEADERS or name == 'web_wefax.h': continue
         if name.endswith('.h') and '/' not in name or name.startswith('FL/'):

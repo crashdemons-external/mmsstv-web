@@ -25,7 +25,7 @@
     "coreSha256": "70e8e8796c7eb66cc226813378b3d4af3b6edba1a84c649fe3c80387ec32ddaf",
     "wasmSha256": "11208424a79145a747c4f60d67dd06e27bae34b562411a8267b2295cd9db17b4"
   },
-  "assetVersion": "01c4d0535cd53875",
+  "assetVersion": "4831b5bcf926fba4",
   "wefax": {
     "version": "fldigi 4.2.13",
     "modes": [
@@ -58,8 +58,8 @@
         "src/include/strutil.h": "2a1d4634fc1f3d540fb1950e986346a160c6e4af39e05ae0476b996060f6567b"
       }
     },
-    "coreSha256": "9434eadca33cbabe805435bcc70fb8ad64f2b09eeefe0a051e6b7275f03e9e93",
-    "wasmSha256": "9ecd7349891ead489a9f4bcd5137ad4b0a0e984ec0d25eab5c5f1ebf967587df"
+    "coreSha256": "8a5904c9486b5e61500a743f4c0b0a4345b0ae2c4ff6b5e4a427b8270ae4e5ba",
+    "wasmSha256": "c918b19a14d83d3f2dfa7555b33f280fee0da00c654192427272ec714d6bdf36"
   },
   "imageModeCount": 48
 }

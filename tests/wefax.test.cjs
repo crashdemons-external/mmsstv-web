@@ -13,7 +13,7 @@ function image(mode,height=16) {
   return {mode,width,height,pixels};
 }
 async function main() {
-  const rx=await WEFAXCore.create(),enc=await WEFAXCore.create(true);
+  const rx=await WEFAXCore.create(),enc=await WEFAXCore.create(true),auto=await MMSSharedDecoder.create();
   const render=(input,format,maximum=32768)=>{
     enc.call('start',{...input,lpm:format});const chunks=[];let count=0,done=false;
     while(!done) {
@@ -49,6 +49,13 @@ async function main() {
       }
     }
     assert(goodRows>=input.height-3,`IOC ${mode}, ${lpm[format]} LPM: decoded grayscale rows (${goodRows})`);
+    await auto.call('reset',{mode:-1});
+    let detected=false,autoPicture;
+    for(let i=0;i<samples.length;i+=32768) {const result=await auto.call('process',{samples:samples.subarray(i,i+32768)});if(result.mode===mode)detected=true;if(result.finished)autoPicture=result.finished;}
+    const ended=await auto.call('finish',{automatic:true});autoPicture=ended.finished||autoPicture;
+    assert(detected,`Auto detects IOC ${mode} at ${lpm[format]} LPM`);
+    assert.equal(autoPicture?.mode,mode,'Auto selects the IOC matching the APT start');
+    assert(autoPicture.height>=input.height-3,'Auto preserves the beginning of the image');
     console.log(`WEFAX ${input.width}px / ${lpm[format]} LPM: ${goodRows} grayscale rows, ${pictures.length} completed page(s)`);
     if(mode===46&&format===1)fixture={input,samples};
   }
@@ -87,6 +94,26 @@ async function main() {
   for(const input of [image(47),{mode:7,width:320,height:256,pixels:new Uint8Array(320*256*4)}]){
     await sharedEncoder.call('start',input);assert((await sharedEncoder.call('read')).pcm.length>0);await sharedEncoder.call('cancel');
   }
+  // Tones and noise alone must never claim WEFAX, even with manual RX saved.
+  await auto.call('fax-option',{id:6,value:1});await auto.call('reset',{mode:-1});
+  let seed=123;const unrelated=new Float32Array(11025*24);
+  for(let i=0;i<unrelated.length;i++) {seed=(Math.imul(seed,1664525)+1013904223)|0;unrelated[i]=i<11025*8?.8*Math.sin(2*Math.PI*300*i/11025):i<11025*16?.8*Math.sin(2*Math.PI*1500*i/11025):(seed/2147483648)*.1;}
+  for(let i=0;i<unrelated.length;i+=32768)assert(!isWEFAXMode((await auto.call('process',{samples:unrelated.subarray(i,i+32768)})).mode),'tones/noise without a matching phasing sequence');
+  const analogEncoder=await MMSCoreEncoder.create(),analogChunks=[];
+  analogEncoder.call('start',{mode:7,width:320,height:256,pixels:new Uint8Array(320*256*4)});
+  let block;do {block=analogEncoder.call('read');analogChunks.push(Float32Array.from(new Int16Array(block.pcm.buffer),v=>v/32768));}while(!block.done);
+  await auto.call('reset',{mode:-1});let analogComplete=false;
+  for(const samples of analogChunks) {const result=await auto.call('process',{samples});assert(!isWEFAXMode(result.mode),'SSTV keeps priority in Auto');if(result.finished){assert.equal(result.finished.mode,7);analogComplete=true;}}
+  assert(analogComplete,'Auto still completes SSTV');
+  let followingFax=false;for(let i=0;i<fixture.samples.length;i+=32768) {const result=await auto.call('process',{samples:fixture.samples.subarray(i,i+32768)});if(result.finished?.mode===46)followingFax=true;}
+  assert(followingFax,'Auto resumes WEFAX detection after SSTV without reset');
+  await auto.call('reset',{mode:-1});
+  await auto.call('process',{samples:fixture.samples.subarray(0,11025*12)});
+  assert.equal((await auto.call('snapshot')).mode,46);
+  let preempted=false;
+  for(const samples of analogChunks) {const result=await auto.call('process',{samples});if(result.receiving&&result.mode===7)preempted=true;if(result.finished)assert.equal(result.finished.mode,7);}
+  assert(preempted,'SSTV preempts an active lower-priority WEFAX receiver');
+  console.log('Auto IOC detection at all speeds, SSTV priority, mixed streams, tone/noise rejection and saved manual settings passed.');
   console.log('WEFAX chunk continuity, manual RX, growing images, bounds, cancellation and SSTV/WEFAX switching passed.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -10,6 +10,7 @@ WebStatus progStatus;
 waterfall waterfall_instance;
 waterfall* wf=&waterfall_instance;
 modem* active_modem=nullptr;
+bool web_fax_auto=false;
 static std::unique_ptr<wefax> fax;
 static int mode=0,width=1809,height=1,line=0,serial=0,revision=0,completed=0;
 static int finishedWidth=0,finishedHeight=0,finishedMode=0,finishedSerial=0;
@@ -104,7 +105,7 @@ static void update_spectrum(const double* data,int length) {
 extern "C" {
 EMSCRIPTEN_KEEPALIVE int fax_reset(int selected) {
     if(selected<0||selected>1)return 0;
-    fax.reset(); active_modem=nullptr; mode=selected; closed=true; manual=false;
+    fax.reset(); active_modem=nullptr; mode=selected; closed=true; manual=false;web_fax_auto=false;
     finishedWidth=finishedHeight=0;finishedPixels.clear();
     wf->carrier=1900; wf->powers.fill(0); fft_ring.fill(0); spectrum.fill(0); fft_write=fft_count=0; level=0;
     progdefaults.WEFAX_MaxRows=8192;
@@ -132,9 +133,11 @@ EMSCRIPTEN_KEEPALIVE void fax_option(int id,double value) {
         if(manual&&fax->web_rx_state()!=3) { fax->skip_apt(); fax->skip_phasing(false); }
         else if(!manual&&fax->web_rx_state()==3) { web_fax_complete(true); fax->end_reception(); }
     }
+    if(id==7)web_fax_auto=bool(value);
 }
 EMSCRIPTEN_KEEPALIVE void fax_finish(int force) { web_fax_complete(force||manual); if(fax)fax->end_reception(); }
 EMSCRIPTEN_KEEPALIVE int fax_state() { return fax?fax->web_rx_state():0; }
+EMSCRIPTEN_KEEPALIVE int fax_detected() { return fax?fax->web_rx_detected():0; }
 EMSCRIPTEN_KEEPALIVE int fax_width() { return width; }
 EMSCRIPTEN_KEEPALIVE int fax_height() { return height; }
 EMSCRIPTEN_KEEPALIVE int fax_line() { return line; }

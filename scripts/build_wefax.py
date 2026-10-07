@@ -7,7 +7,7 @@ def build(command, env, debug=False):
     dst=prepare()
     files=[ROOT/'native/wefax/core.cpp',ROOT/'native/wefax/web_modem.cpp']
     files += [dst/name for name in ['wefax.cxx','filters.cxx','fftfilt.cxx','strutil.cxx','mode_table.cpp']]
-    names='reset process option finish state width height line serial revision completed pixels finished_pixels finished_width finished_height finished_mode finished_serial level frequency spectrum encode_start encode_read encode_done encode_progress encode_cancel'.split()
+    names='reset process option finish state detected width height line serial revision completed pixels finished_pixels finished_width finished_height finished_mode finished_serial level frequency spectrum encode_start encode_read encode_done encode_progress encode_cancel'.split()
     flags=['-std=c++17','-I'+str(ROOT/'native/wefax'),'-I'+str(dst/'include'),'-Wno-unused-value']
     flags += ['-O1','-g3','-sASSERTIONS=2','-sSAFE_HEAP=1'] if debug else ['-O3']
     flags += ['-sMODULARIZE=1','-sEXPORT_NAME=createWEFAX','-sENVIRONMENT=web,worker,node','-sALLOW_MEMORY_GROWTH=1','-sINITIAL_MEMORY=33554432','-sSTACK_SIZE=2097152','-sFILESYSTEM=0','-sEXPORTED_FUNCTIONS='+json.dumps(['_fax_'+n for n in names]+['_malloc','_free']),'-sEXPORTED_RUNTIME_METHODS=["HEAPF32","HEAPU8","HEAP32"]']

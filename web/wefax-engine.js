@@ -18,7 +18,7 @@
     call(action,args={}) {
       const m=this.core;
       if(action==='reset') { this.mode=args.mode;m._fax_reset(this.mode-46);this.revision=-1;this.completed=m._fax_completed(); }
-      if(action==='option') { m._fax_option(args.id,args.value);if([0,1,5].includes(args.id))return {}; }
+      if(action==='option') { m._fax_option(args.id,args.value);if([0,1,5,7].includes(args.id))return {}; }
       if(action==='finish')m._fax_finish(args.automatic?0:1);
       if(action==='process')for(let i=0;i<args.samples.length;i+=65536) {const part=args.samples.subarray(i,i+65536);m.HEAPF32.set(part,this.pointer/4);m._fax_process(this.pointer,part.length);}
       if(action==='start') {
@@ -42,6 +42,7 @@
     snapshot() {
       const m=this.core,width=m._fax_width(),height=m._fax_height(),revision=m._fax_revision();
       const result={mode:this.mode,width,height,revision,serial:m._fax_serial(),completed:m._fax_completed(),line:m._fax_line(),receiving:m._fax_state()===3,faxState:m._fax_state(),level:m._fax_level(),afc:m._fax_frequency()-1900,fsk:'',spectrum:m.HEAP32.slice(m._fax_spectrum()/4,m._fax_spectrum()/4+1024)};
+      result.faxDetected=m._fax_detected();
       if(revision!==this.revision) {this.revision=revision;result.pixels=m.HEAPU8.slice(m._fax_pixels(),m._fax_pixels()+width*height*4);}
       if(result.completed!==this.completed) {
         this.completed=result.completed;const w=m._fax_finished_width(),h=m._fax_finished_height();
@@ -67,16 +68,23 @@
       this.queue=pending.catch(()=>{});return pending;
     }
     async handle(action,args) {
-      if(action==='reset')this.mode=args.mode;
+      if(action==='reset') {this.mode=args.mode;this.autoActive=this.autoDisplay=null;this.autoNeedsReset=true;}
       if(action==='fax-option') {
         if([1,5,6].includes(args.id))this.faxOptions[args.id]=args.value;
+        if(this.mode===-1&&this.autoCandidates) {
+          if([1,5].includes(args.id)) {for(const engine of this.autoCandidates)await engine.call('option',args);return {};}
+          return this.autoDisplay==null?{}:this.adapt(await this.autoCandidates[this.autoDisplay].call('option',args));
+        }
         if(!isFax(this.mode))return {};
         return this.adapt(await this.fax.call('option',args));
       }
       if(action==='option') {
         this.options[args.id]=args.value;
         if(isFax(this.mode))return args.id===0?this.adapt(await this.fax.call('option',{id:0,value:args.value})):{};
+        if(this.mode===-1&&args.id===0&&this.autoCandidates)for(const engine of this.autoCandidates)await engine.call('option',args);
       }
+      if(this.mode===-1&&action==='process')return this.processAuto(args.samples);
+      if(this.mode===-1&&this.autoDisplay!==null&&this.autoDisplay!==undefined&&['snapshot','finish','redraw'].includes(action))return this.adapt(await this.autoCandidates[this.autoDisplay].call(action==='redraw'?'snapshot':action,args));
       let engine=this.analog;
       if(isFax(this.mode)) {
         this.fax ||= await createFaxEngine();engine=this.fax;
@@ -84,10 +92,46 @@
       }
       return this.adapt(await engine.call(action,args));
     }
-    adapt(result) {
+    async resetAutoCandidates() {
+      this.autoCandidates ||= await Promise.all([createFaxEngine(),createFaxEngine()]);
+      for(let index=0;index<2;index++) {
+        const engine=this.autoCandidates[index];await engine.call('reset',{mode:46+index});
+        for(const id of [1,5])if(this.faxOptions[id]!==undefined)await engine.call('option',{id,value:this.faxOptions[id]});
+        await engine.call('option',{id:0,value:this.options[0]??1});
+        await engine.call('option',{id:7,value:1});
+      }
+      this.autoNeedsReset=false;
+    }
+    async processAuto(samples) {
+      let result,finished;
+      for(let pos=0;pos<samples.length;pos+=4096) {
+        const part=samples.subarray(pos,pos+4096);
+        // Workers transfer input buffers. Each decoder receives its own copy.
+        const analog=await this.analog.call('process',{samples:part.slice()});
+        if(analog.receiving||analog.finished) {
+          this.autoActive=this.autoDisplay=null;this.autoNeedsReset=true;result=analog;
+        }else {
+          if(this.autoNeedsReset||!this.autoCandidates)await this.resetAutoCandidates();
+          const indices=this.autoActive===null||this.autoActive===undefined?[0,1]:[this.autoActive];
+          const states=[];
+          for(const index of indices)states[index]=await this.autoCandidates[index].call('process',{samples:part.slice()});
+          const detected=indices.find(index=>states[index].faxDetected===2);
+          if(detected!==undefined)this.autoActive=this.autoDisplay=detected;
+          if(this.autoDisplay!==null&&this.autoDisplay!==undefined) {
+            result=states[this.autoDisplay]||await this.autoCandidates[this.autoDisplay].call('snapshot');
+            if(!result.faxDetected)this.autoActive=null;
+          }else result=analog;
+        }
+        if(result.finished) {finished=result.finished;++this.completed;}
+      }
+      result ||= await this.analog.call('snapshot');
+      if(finished)result.finished=finished;
+      return this.adapt(result,false);
+    }
+    adapt(result,count=true) {
       if(result.serial===undefined)return result;
-      const prefix=isFax(this.mode)?'wefax-':'sstv-';result.serial=prefix+result.serial;
-      if(result.finished) {result.finished.serial=prefix+result.finished.serial;++this.completed;}
+      const prefix=isFax(result.mode)?'wefax-':'sstv-';result.serial=prefix+result.serial;
+      if(result.finished) {result.finished.serial=(isFax(result.finished.mode)?'wefax-':'sstv-')+result.finished.serial;if(count)++this.completed;}
       result.completed=this.completed;return result;
     }
   }

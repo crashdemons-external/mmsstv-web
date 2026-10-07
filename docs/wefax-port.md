@@ -5,11 +5,15 @@ and IOC288 (904 pixels), with 240, 120, 90 and 60 lines/minute. It processes
 11025 Hz mono audio. WEFAX is separate from the existing QSSTV FAX480 mode.
 No fldigi interface, sound-device backend or radio controls are imported.
 
-Select a WEFAX mode before opening audio: **More modes…** in MMSSTV, or the
-Receive **Mode** selector in QSSTV. **Auto** still detects SSTV. Both perspectives
+**Auto** detects SSTV first and runs both WEFAX IOC receivers in the background
+while SSTV is idle. A matching APT start plus four valid phasing lines selects
+the IOC mode and estimates 240/120/90/60 LPM. An SSTV reception takes priority,
+including when it begins during WEFAX. Auto retains its selected setting and
+shows the detected mode separately. Both perspectives
 share the active receiver, images, history, settings and WAV generation.
 **WEFAX settings…** supplies receive line speed, carrier (1900 Hz by default),
 Skip APT, Skip phasing and End page. For recordings starting inside a picture,
+select an IOC mode under **More modes…** in MMSSTV or **Mode** in QSSTV, then
 enable **Recording starts in the image** before loading audio. This bypasses
 APT/phasing and automatic stopping; Stop or the end of the recording finishes
 the partial page. Disable it for normal broadcasts with start/stop sequences.
@@ -27,13 +31,20 @@ The selected, unmodified upstream files live in `third_party/fldigi/`; their
 hashes are in `fldigi-wefax-upstream.json`. `scripts/prepare_wefax.py` creates
 the portable overlay under `build/wefax/`. The compiler emits separate
 `web/wefax-core.js` and `web/wefax-core.wasm`. Workers load this module only
-when WEFAX is selected or encoded; main-thread fallback is also supported.
+when WEFAX is selected, encoded, or Auto begins processing audio; main-thread
+fallback is also supported. Auto feeds separate copies to each worker and
+pauses the other IOC receiver once WEFAX is acquired.
 Normal builds require no access to the original `fldigi-web` checkout.
 
 The port reuses fldigi-web's resumable native transmit loop and the modem
 output envelope/limiter. Receive history that desktop stores in method
 statics is moved to each modem instance so source and mode resets are clean.
 The selected LPM also updates the native correlation/AFC timing estimate.
+Auto uses the measured phasing period to select the nearest supported LPM.
+During Auto acquisition after APT, the overlay lowers the native minimum
+phasing period from 0.4 to 0.2 seconds so the supported 240 LPM mode
+(0.25 seconds/line) can acquire phasing. Image reception retains the original
+threshold to avoid treating picture detail as another phasing sequence.
 Native page-end callbacks retain RGBA images for the shared gallery, including
 partial pages. Brief near-black phasing/stop-tone artifacts are excluded from
 automatic history and file completion; explicit Stop/End page and manual
@@ -43,6 +54,8 @@ fldigi's native phasing alignment and may include transition rows.
 `tests/wefax.test.cjs` checks both IOC modes at all four speeds, grayscale pixel
 values, native sequence duration, pull-size independence, missing-preamble
 reception, image growth, bounds, cancellation and shared SSTV/WEFAX routing.
+Auto tests cover both IOCs at all speeds, SSTV priority and preemption,
+mixed streams, noise/tone rejection, and ignoring saved manual-RX preferences.
 These generated-signal tests do not establish behavior on every noisy broadcast.
 Live microphone capture and noisy/off-frequency recordings need device testing.
 

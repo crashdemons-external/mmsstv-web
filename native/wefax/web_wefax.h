@@ -5,6 +5,7 @@ inline LPM_VALUES all_lpm_values[4]={{240,"240"},{120,"120"},{90,"90"},{60,"60"}
 void web_fax_new_page(int);
 void web_fax_complete(bool force=false);
 void web_fax_begin_image(int);
+extern bool web_fax_auto;
 inline void activate_wefax_image_item(bool) {}
 namespace wefax_pic {
 inline int width=1809;

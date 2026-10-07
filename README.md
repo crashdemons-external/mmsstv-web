@@ -32,7 +32,8 @@ runtime package dependencies.
   start, AFC, LMS, selectable BPF and demodulator, and optional received FSK ID.
 - WEFAX IOC576/IOC288 reception and grayscale WAV generation through fldigi,
   with four line speeds, APT/phasing and manual reception of partial recordings.
-  Selectable from the existing RX/TX mode lists in both interfaces.
+  Selectable from the existing RX/TX mode lists in both interfaces; Auto detects
+  WEFAX start/phasing sequences with lower priority than SSTV.
 - Progressive RX picture, original FFT spectrum, waterfall and Sync display.
 - Phase/slant redraw from retained demodulated signal; automatic sync/stop/slant.
 - History and stock pictures stored locally using IndexedDB. Session history
@@ -59,8 +60,8 @@ Hardware control, PTT and live radio/speaker output are disabled. Native FTP
 and QSSTV's FTP-based hybrid server/“Who is on” features are grayed out because
 browsers do not expose FTP sockets. DRM and offline digital transmission work.
 FAX480 has no VIS and requires selecting it manually before opening a recording;
-WEFAX also requires selecting its IOC mode before opening audio; use WEFAX settings
-for recordings without an APT/phasing preamble. Phase/slant redraw applies to the
+Auto detects WEFAX recordings with an APT/phasing preamble. For recordings starting
+inside the image, select its IOC mode and use WEFAX settings. Phase/slant redraw applies to the
 original analog modes. Original desktop
 configuration/history/template binary formats are not imported; browser JSON
 backups/templates are supported. See [the capability notes](docs/qsstv-port.md).
