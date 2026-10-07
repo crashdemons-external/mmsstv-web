@@ -23,3 +23,27 @@ copyright/license texts are provided in `web/licenses/` (the built app's
 `licenses/` directory). Their unmodified upstream sources are available from
 the official [Emscripten project](https://github.com/emscripten-core/emscripten)
 and [LLVM project](https://github.com/llvm/llvm-project).
+
+
+QSSTV 9.5.11 source and additional toolbar icons: Johan Maes, ON4QZ, and
+contributors. The HAMDRM receiver includes work by M. Bos, PA0MBO; the Dream
+transmitter includes its original contributors' notices. Phil Karn's
+Reed–Solomon code is retained with its upstream notice. The selected original
+QSSTV/Dream sources are GPL-2.0-or-later; see the unmodified `qsstv-src/` tree
+and `licenses/QSSTV-COPYING.txt`. The upstream tree also includes its
+`LICENSE` file, copied to `licenses/QSSTV-LICENSE.txt`.
+[Official QSSTV source](https://github.com/ON4QZ/QSSTV).
+
+OpenJPEG 2.5.4: Université catholique de Louvain and its listed contributors,
+BSD-2-Clause. The unmodified library is in `third_party/openjpeg/`; its license
+is in `licenses/OpenJPEG.txt`.
+[Official OpenJPEG source](https://github.com/uclouvain/openjpeg/tree/v2.5.4).
+No OpenJPEG build/package installation scripts are executed.
+
+The combined browser application and newly written shared UI/modem adapters
+are GPL-3.0-or-later, compatible with the above GPL-2.0-or-later and
+LGPL-3.0-or-later components. The independent MMSSTV core retains its original
+LGPL-3.0-or-later terms. OpenJPEG retains BSD-2-Clause terms. Runtime JavaScript
+loaders and WebAssembly binaries are distributed as separate files. No FFTW
+library is linked: the browser boundary supplies its own small FFT-compatible
+implementation for the original modem's calls.

@@ -6,15 +6,22 @@
   <meta name="description" content="Decode SSTV audio and generate SSTV WAV files from images locally with the original MMSSTV DSP.">
   <title>MMSSTV web — Ver 1.13A</title>
   <link rel="icon" href="assets/mmsstv.ico">
-  <link rel="stylesheet" href="style.css">
-  <script defer src="mmsstv-core.js"></script>
-  <script defer src="audio.js"></script>
-  <script defer src="engine.js"></script>
-  <script defer src="app.js"></script>
+  <link rel="stylesheet" href="style.css?v=e2a5ae329ddf88eb">
+  <link rel="stylesheet" href="qsstv.css?v=e2a5ae329ddf88eb">
+  <script defer src="asset-version.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="mmsstv-core.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="audio.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="engine.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="digital-engine.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="images.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="app.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="features.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="editor.js?v=e2a5ae329ddf88eb"></script>
+  <script defer src="interfaces.js?v=e2a5ae329ddf88eb"></script>
 </head>
 <body>
 <main class="desktop" id="desktop" aria-label="MMSSTV browser receiver">
-  <div class="titlebar"><img src="assets/mmsstv.ico" alt=""><span id="window-title">MMSSTV — Ver 1.13A (Web)</span><span class="title-end">RX / WAV export</span></div>
+  <div class="titlebar"><img src="assets/mmsstv.ico" alt=""><span id="window-title">MMSSTV — Ver 1.13A (Web)</span><a class="interface-switch" href="#qsstv" id="switch-qsstv">Switch to QSSTV</a></div>
   <nav class="menubar" aria-label="Main menu">
     <div class="menu"><button aria-expanded="false"><u>F</u>ile</button><div class="menu-popup">
       <button data-action="open-audio">Play sound from file…<kbd>Ctrl+O</kbd></button>
@@ -24,7 +31,7 @@
       <button data-action="save-image" class="needs-image" disabled>Save picture…<kbd>Ctrl+S</kbd></button>
       <button data-action="export-history">Save history data…</button>
       <button data-action="export-log">Save log data…</button><hr>
-      <button disabled>Print…</button><button disabled>Exit</button>
+      <button data-action="print-image" class="needs-image" disabled>Print…</button><button disabled>Exit</button>
     </div></div>
     <div class="menu"><button aria-expanded="false"><u>E</u>dit</button><div class="menu-popup">
       <button data-action="copy-image" class="needs-image" disabled>Copy picture</button>
@@ -109,9 +116,9 @@
         <div class="log-line"><label for="name">Name</label><input id="name" maxlength="80"><label for="qth">Qth</label><input id="qth" maxlength="100"></div>
         <div class="log-line"><label for="note">Note</label><input id="note" maxlength="200"></div>
         <div class="log-line"><label for="qsl">QSL</label><input id="qsl" maxlength="100"><button id="rx-id" aria-pressed="false" title="Enable received FSK ID decoding">RxID</button><button id="tx-id" aria-pressed="false" title="Include FSK callsign in generated SSTV WAV files">TxID</button><button class="icon" disabled title="External logging link unavailable"><img src="assets/SBULog.png" alt="External log"></button></div>
-        <div class="log-buttons"><button id="save-qso" title="Save this entry in the browser log">QSO</button><button data-action="log-data">Data</button><button disabled>Find</button><button data-action="clear-log">Clear</button><button data-action="log-list">List</button><input id="frequency" value="14.230" list="frequency-values" aria-label="Log frequency MHz"></div>
+        <div class="log-buttons"><button id="save-qso" title="Save this entry in the browser log">QSO</button><button data-action="log-data">Data</button><button data-action="find-log">Find</button><button data-action="clear-log">Clear</button><button data-action="log-list">List</button><input id="frequency" value="14.230" list="frequency-values" aria-label="Log frequency MHz"></div>
       </fieldset>
-      <div class="template-options"><label><input type="checkbox" disabled>Show with template</label><label class="unavailable"><input type="checkbox" checked disabled>Draft</label><span id="rx-info">Ready</span></div>
+      <div class="template-options"><label><input id="mms-template" type="checkbox">Use TX template</label><label class="unavailable"><input type="checkbox" checked disabled>Draft</label><span id="rx-info">Ready</span></div>
     </section>
   </div>
   <div class="stock-tabs tabs" aria-label="Stock pictures">
@@ -125,13 +132,13 @@
     <div class="source-summary"><span id="source-name">Initializing MMSSTV…</span><progress id="file-progress" max="1" value="0" aria-label="Audio file progress"></progress></div>
     <button data-action="save-image" class="needs-image" disabled>Save…</button>
   </div>
-  <div class="statusbar" role="status"><span id="status">Loading original MMSSTV receiver…</span><span id="mode-status">Auto</span><span id="time-status">00:00</span><span>11025 Hz</span></div>
+  <div class="statusbar" role="status"><span id="status">Loading original MMSSTV receiver…</span><span id="mode-status">Auto</span><span id="time-status">00:00</span><span id="sample-status">11025 Hz</span></div>
 </main>
 <datalist id="rst-values"><option value="595"><option value="575"><option value="555"><option value="594"><option value="574"><option value="554"><option value="444"><option value="333"></datalist>
 <datalist id="frequency-values"><option value="7.033"><option value="14.230"><option value="21.340"><option value="28.680"><option value="144.450"></datalist>
 <input type="file" id="audio-file" accept="audio/*,.mmv,.wav,.wave,.mp3,.ogg,.flac,.m4a,.aac" hidden>
-<input type="file" id="image-file" accept="image/*" multiple hidden>
-<input type="file" id="tx-image-file" accept="image/*" hidden>
+<input type="file" id="image-file" accept="image/*,.jp2,.j2k" multiple hidden>
+<input type="file" id="tx-image-file" accept="image/*,.jp2,.j2k" hidden>
 <dialog id="modal" class="classic-dialog" aria-labelledby="dialog-title">
   <div class="dialog-titlebar"><span id="dialog-title"></span><button id="dialog-close" aria-label="Close dialog">×</button></div>
   <div id="dialog-content"></div>

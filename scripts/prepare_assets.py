@@ -47,6 +47,14 @@ def prepare():
     for source in (ROOT / 'mmsstv-src/res').glob('*.bmp'):
         bitmap_png(source, target / (source.stem+'.png'))
     shutil.copyfile(ROOT / 'mmsstv-src/Mmsstv_Icon.ico', target / 'mmsstv.ico')
+    qicons=target / 'qsstv'
+    qicons.mkdir(exist_ok=True)
+    for name in ['qsstv','start','stop','replay','eraser','camera','binary','tone','sweep','filesave']:
+        shutil.copyfile(ROOT / 'qsstv-src/src/icons' / (name+'.png'),qicons / (name+'.png'))
+    licenses=ROOT / 'web/licenses'
+    licenses.mkdir(exist_ok=True)
+    shutil.copyfile(ROOT / 'qsstv-src/COPYING',licenses / 'QSSTV-COPYING.txt')
+    shutil.copyfile(ROOT / 'qsstv-src/LICENSE',licenses / 'QSSTV-LICENSE.txt')
     for name in ['COPYING.txt','COPYING.LESSER.txt','THIRD_PARTY_NOTICES.md']:
         shutil.copyfile(ROOT / name, ROOT / 'web' / name)
     print('Prepared original MMSSTV toolbar icons and licenses.')

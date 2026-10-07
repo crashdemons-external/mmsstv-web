@@ -1,7 +1,7 @@
 {
-  "upstream": "MMSSTV 1.13A",
+  "upstream": "MMSSTV 1.13A + QSSTV AVT24/94 and FAX480",
   "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)",
-  "modeCount": 43,
+  "modeCount": 46,
   "sources": {
     "sstv.cpp": "f42c3f7e683e07a71feaeecd7c96b3415eee7889fe0e5276b82692b354372e0b",
     "sstv.h": "331cd3fd08ae85a38cd5ad82036ede0dc1792ae04e747e567f1c98be9ca1bb00",
@@ -12,6 +12,18 @@
     "Main.cpp": "92a3b3f768d600ac55300827b4fd382a6ef62f38852752c7f88b56673b916d56",
     "ComLib.cpp": "e5632bb45b1703a2e99b09439b9102503f7bf5f17dde16099c6b6f3f477b6c03"
   },
-  "coreSha256": "a106f08ac5804ec659bef3d09d5c2365164836d99bc5192b801846d93a2e53ef",
-  "wasmSha256": "07459791079c03dee35205c8e7f50da83cc8a4090a8870fd04755f9ef070662d"
+  "coreSha256": "80b9bc2d52c06eb4bf920919e0169939b918d753da930313da7b6272262d0225",
+  "wasmSha256": "99c1cde1f10d8d5d0aba9a85d490413eadc5a403cfccbc0d8f50b960b84a2615",
+  "qsstv": {
+    "version": "9.5.11",
+    "commit": "8c27d6d169d8c6c197eb47c2089870e39bc06a02",
+    "coreSha256": "f101ff0da0f07a33eb419828001f614e329dd2f6144041f5e4b2059090a449bf",
+    "wasmSha256": "ce5121e4d6e359b343e395c340d71a357f8e9c81794d9464f20325df0a884a28"
+  },
+  "openjpeg": {
+    "version": "2.5.4",
+    "coreSha256": "70e8e8796c7eb66cc226813378b3d4af3b6edba1a84c649fe3c80387ec32ddaf",
+    "wasmSha256": "11208424a79145a747c4f60d67dd06e27bae34b562411a8267b2295cd9db17b4"
+  },
+  "assetVersion": "e2a5ae329ddf88eb"
 }

@@ -6,7 +6,8 @@
       throw new Error('Serve web/ over HTTP(S) to load the separate WASM file; run python scripts/serve.py.');
     }
     // Emscripten resolves mmsstv-core.wasm beside its JavaScript loader.
-    return createMMSSTV();
+    const version=typeof location==='undefined'?'':root.MMSAssetVersion||new URLSearchParams(location.search).get('v')||'';
+    return createMMSSTV({locateFile:(name,dir)=>dir+name+(version?'?v='+version:'')});
   }
   class CoreEngine {
     static async create() {
@@ -36,7 +37,7 @@
       const result={revision,width,height,mode:m._web_mode(),serial:m._web_serial(),completed:m._web_completed(),receiving:!!m._web_receiving(),line:m._web_line(),level:m._web_level(),afc:m._web_afc(),fsk:m.UTF8ToString(m._web_fsk())};
       if(result.completed!==this.completed) {
         const w=m._web_completed_width(),h=m._web_completed_height(),p=m._web_completed_pixels();
-        result.finished={width:w,height:h,mode:m._web_completed_mode(),serial:m._web_completed_serial(),pixels:m.HEAPU8.slice(p,p+w*h*4)};
+        result.finished={width:w,height:h,line:m._web_completed_line(),fraction:m._web_completed_fraction(),mode:m._web_completed_mode(),serial:m._web_completed_serial(),pixels:m.HEAPU8.slice(p,p+w*h*4)};
         this.completed=result.completed;
       }
       if(revision!==this.revision) {
@@ -54,7 +55,7 @@
       if(location.protocol!=='file:' && typeof Worker!=='undefined') {
         let worker;
         try {
-          worker=new Worker('decoder-worker.js');
+          worker=new Worker('decoder-worker.js?v='+(root.MMSAssetVersion||''));
           const engine=new DecoderEngine(worker);
           const initialized=await engine.call('init');engine.modes=initialized.modes;return engine;
         } catch(error) { if(worker)worker.terminate();console.warn('Using the main-thread receiver.',error); }
@@ -103,7 +104,7 @@
     static async create(){
       if(location.protocol!=='file:' && typeof Worker!=='undefined'){
         let worker;
-        try{worker=new Worker('encoder-worker.js');const engine=new EncoderEngine(worker);await engine.call('init');return engine;}
+        try{worker=new Worker('encoder-worker.js?v='+(root.MMSAssetVersion||''));const engine=new EncoderEngine(worker);await engine.call('init');return engine;}
         catch(error){worker?.terminate();console.warn('Using the main-thread audio encoder.',error);}
       }
       return new EncoderEngine(null,await CoreEncoder.create());

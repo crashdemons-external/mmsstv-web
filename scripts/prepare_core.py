@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import hashlib
 import json
+from extend_modes import extend
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'mmsstv-src'
@@ -91,5 +92,6 @@ def prepare():
     manifest = {name: hashlib.sha256((SRC / name).read_bytes()).hexdigest()
                 for name in ['sstv.cpp', 'sstv.h', 'fir.cpp', 'fir.h', 'Fft.cpp', 'Fft.h', 'Main.cpp', 'ComLib.cpp']}
     (OUT / 'source-hashes.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    extend(OUT)
 
 if __name__ == '__main__': prepare()

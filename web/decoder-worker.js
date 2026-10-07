@@ -1,5 +1,5 @@
 'use strict';
-importScripts('mmsstv-core.js','engine.js');
+importScripts('mmsstv-core.js'+self.location.search,'engine.js'+self.location.search);
 let engine;
 let queue=Promise.resolve();
 self.onmessage=event=>{

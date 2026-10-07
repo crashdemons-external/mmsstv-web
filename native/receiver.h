@@ -36,8 +36,13 @@ public:
     CFFT fft;
     bool useLms = false, active = false, locked = false;
     int serial = 0, completed = 0, revision = 0, selected = -1;
-    int completedMode = 0, completedSerial = 0;
+    int completedMode = 0, completedSerial = 0, completedLine = 0;
+    double completedFraction=0;
     std::vector<short> stored, storedSync;
+    std::unique_ptr<CHILL> faxDem;
+    std::vector<double> faxBuffer;
+    int faxClock=-1, faxSync=0; bool faxGap=false, faxDone=false;
+    void faxSample(double value);
     WebReceiver();
     void reset(int mode);
     void process(const float* data, int count);

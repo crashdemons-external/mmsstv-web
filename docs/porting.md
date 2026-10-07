@@ -83,14 +83,15 @@ for starting the local static preview server.
 The UI follows `Main.dfm`, the English configuration and reference screenshots,
 using the actual `mmsstv-src/res/` toolbar glyphs and MMSSTV application icon.
 The browser audio controls are added beneath the original stock-image pane.
-Disabled controls represent features outside this receiver port's scope.
+Hardware controls remain disabled. The shared QSSTV/digital extension is
+described in [qsstv-port.md](qsstv-port.md).
 
 History contains PNG snapshots and metadata, with IndexedDB persistence per
 origin. Settings, profiles and log entries use localStorage. No data leaves the
 browser except explicit user downloads. Clearing site data clears local history;
-the history JSON download is an external backup. History archives currently
-export only; import of original `History.bin`, transmit templates and desktop
-configuration files is not implemented.
+the history JSON download is an external backup. Browser history and text-template JSON can be exported and imported. Import
+of original `History.bin`, desktop template files and desktop configuration
+files is not implemented.
 
 ## Verification limits
 
@@ -104,3 +105,7 @@ Checked heap builds exercise the same full-image suite. Browser-generated
 PNG/BMP pixels and JPEG dimensions are checked from the prepared download links.
 These tests do not establish every mode's
 behavior with real noisy radio signals or every browser/device combination.
+
+The original 43 modes now also share QSSTV AVT24/AVT94 and FAX480 extensions.
+The original source trees stay immutable; timing changes are applied to
+prepared copies by `scripts/extend_modes.py`.

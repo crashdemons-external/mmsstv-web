@@ -18,6 +18,7 @@ bool WebEncoder::start(int selected,const BYTE* pixels,int width,int height,cons
     image.rgba.assign(pixels,pixels+size_t(width)*height*4);
     mod=std::make_unique<CSSTVMOD>();mod->OpenTXBuf(14);mod->InitTXBuf();
     mod->Write(0,100);
+    if(selected==smFAX480){for(int i=0;i<1220;i++){mod->Write(1500,2.05);mod->Write(2300,2.05);}return true;}
     // Default MMSSTV header (OutHEAD, VOX off).
     const int wide[]={1900,1500,1900,1500,2300,1500,2300,1500};
     const int narrow[]={1900,2300,1900,2300};

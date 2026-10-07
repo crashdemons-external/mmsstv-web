@@ -25,6 +25,8 @@ void WebReceiver::reset(int mode) {
     m_SyncPos = m_SyncRPos = -1;
     m_AutoSyncCount = m_AutoSyncDis = 0;
     InitAutoStop();
+    faxDem=std::make_unique<CHILL>();faxBuffer.clear();faxClock=-1;faxSync=0;faxGap=faxDone=false;
+    if(mode==smFAX480){dem->m_Sync=0;dem->m_MSync=0;dem->m_SyncMode=-1;image.resize(512,500);}
     fft.InitFFT();
     fft.m_CollectFFT = 0;
     ++revision;
@@ -55,6 +57,8 @@ void WebReceiver::finish() {
         completedImage.resize(image.Width, image.Height);
         completedImage.data = image.data;
         completedMode = SSTVSET.m_Mode; completedSerial = serial;
+        completedLine = std::clamp(m_AY, 0, image.Height);
+        completedFraction=std::clamp(double(m_AY)/std::max(1,SSTVSET.m_L),0.0,1.0);
         ++completed; ++revision;
     }
     active = false;
@@ -99,6 +103,7 @@ void WebReceiver::process(const float* data, int count) {
             if (useLms) value = lms.Do(value);
             fftData[i] = value;
             dem->Do(value);
+            if(selected==smFAX480)faxSample(value);
             dem->m_lvl.Fix();
             if (dem->m_LevelType) dem->m_SyncLvl.Fix();
             // Drain at every line boundary; no dropped ring-buffer pages at high file speeds.
@@ -113,6 +118,34 @@ void WebReceiver::process(const float* data, int count) {
         double corrected = SSTVSET.m_SampFreq;
         m_ReqSampChg = 0;
         redraw((corrected / sys.m_SampFreq - 1)*1e6, 0);
+    }
+}
+
+// QSSTV FAX480 timing, using the original MMSSTV Hilbert FM demodulator.
+// This mode has no VIS; manually select it before opening a complete recording.
+void WebReceiver::faxSample(double value) {
+    double d=faxDem->Do(value);
+    if(faxDone)return;
+    if(faxClock<0){if(std::abs(value)<100)return;faxClock=0;}
+    if(++faxClock<5.002*SampFreq+12)return;
+    if(!active){image.resize(512,500);active=true;m_AY=0;++serial;}
+    if(faxGap){if(d>21000)return;faxGap=false;faxBuffer.clear();}
+    if(m_AY==0 && faxBuffer.size()>SampFreq*.35)faxBuffer.erase(faxBuffer.begin(),faxBuffer.begin()+int(SampFreq*.06));
+    faxBuffer.push_back(d);
+    if(d>21000)++faxSync;else faxSync=0;
+    if(faxSync>=24 && faxBuffer.size()>SampFreq*.20 || (m_AY>0 && faxBuffer.size()>SampFreq*.28)){
+        int count=int(faxBuffer.size())-faxSync;if(m_AY==0 && count>int(.262146*SampFreq)){int trim=count-int(.262146*SampFreq);faxBuffer.erase(faxBuffer.begin(),faxBuffer.begin()+trim);count-=trim;}
+        if(count>0 && m_AY<500){
+            for(int x=0;x<512;x++){
+                int a=x*count/512,b=std::max(a+1,(x+1)*count/512);double sum=0;
+                for(int n=a;n<b;n++)sum+=faxBuffer[n];
+                BYTE gray=BYTE(std::clamp(128.0-sum/(b-a)/128.0,0.0,255.0));
+                BYTE* p=image.data.data()+(size_t(m_AY)*512+x)*3;p[0]=p[1]=p[2]=gray;
+            }
+            ++m_AY;++revision;
+        }
+        faxBuffer.clear();faxSync=0;faxGap=true;
+        if(m_AY==500){faxDone=true;finish();}
     }
 }
 
@@ -179,7 +212,9 @@ EMSCRIPTEN_KEEPALIVE int web_completed_width() { return receiver->completedImage
 EMSCRIPTEN_KEEPALIVE int web_completed_height() { return receiver->completedImage.Height; }
 EMSCRIPTEN_KEEPALIVE int web_completed_mode() { return receiver->completedMode; }
 EMSCRIPTEN_KEEPALIVE int web_completed_serial() { return receiver->completedSerial; }
-EMSCRIPTEN_KEEPALIVE int web_receiving() { return receiver->dem->m_Sync; }
+EMSCRIPTEN_KEEPALIVE double web_completed_fraction() { return receiver->completedFraction; }
+EMSCRIPTEN_KEEPALIVE int web_completed_line() { return receiver->completedLine; }
+EMSCRIPTEN_KEEPALIVE int web_receiving() { return receiver->selected==smFAX480?receiver->active:receiver->dem->m_Sync; }
 EMSCRIPTEN_KEEPALIVE int web_line() { return std::max(0, receiver->m_AY); }
 EMSCRIPTEN_KEEPALIVE double web_level() { return receiver->dem->m_lvl.m_CurMax / 32768; }
 EMSCRIPTEN_KEEPALIVE int web_afc() { return receiver->dem->m_AFCFQ; }

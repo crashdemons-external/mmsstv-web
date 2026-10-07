@@ -4,6 +4,6 @@
   "scripts": {
     "build": "python scripts/build.py",
     "start": "python scripts/serve.py",
-    "test": "node tests/core.test.cjs && node tests/audio.test.cjs && node tests/encoder.test.cjs"
+    "test": "node tests/core.test.cjs && node tests/audio.test.cjs && node tests/encoder.test.cjs && node tests/digital.test.cjs && node tests/bsr.test.cjs && node tests/images.test.cjs && node tests/fax.test.cjs && node tests/features.test.cjs"
   }
 }

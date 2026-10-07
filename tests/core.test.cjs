@@ -3,11 +3,11 @@ const assert=require('node:assert/strict');
 const create=require('../web/mmsstv-core.js');
 const {Signal}=require('./signal.cjs');
 (async()=>{
-  const m=await create();m._web_init();assert.equal(m._web_mode_count(),43);
+  const m=await create();m._web_init();assert.equal(m._web_mode_count(),46);
   const pointer=m._malloc(4096*4);
   const process=values=>{for(let n=0;n<values.length;n+=4096){const chunk=values.subarray(n,n+4096);m.HEAPF32.set(chunk,pointer/4);m._web_process(pointer,chunk.length);}};
-  for(let mode=0;mode<43;mode++){
-    m._web_reset(mode);assert.equal(m._web_mode(),mode);assert.ok(m.UTF8ToString(m._web_mode_name(mode)).length);assert.ok([320,512,640,800].includes(m._web_mode_width(mode)));
+  for(let mode=0;mode<46;mode++){
+    m._web_reset(mode);assert.equal(m._web_mode(),mode);assert.ok(m.UTF8ToString(m._web_mode_name(mode)).length);assert.ok([128,320,512,640,800].includes(m._web_mode_width(mode)));
     process(new Float32Array(8192));
   }
   const cases=[{name:'Martin 2',id:7,signal:new Signal().martin(true)},{name:'Scottie 1',id:3,signal:new Signal().scottie()},{name:'Robot 36',id:0,signal:new Signal().robot()},{name:'PD120',id:13,signal:new Signal().pd120()}];
@@ -37,8 +37,10 @@ const {Signal}=require('./signal.cjs');
   require('../web/engine.js');
   const adapter=new global.MMSCoreEngine(m);
   adapter.call('option',{id:0,value:1});
-  assert.equal(adapter.call('snapshot').finished.mode,13,'option updates preserve pending completed-image notification');
+  const finished=adapter.call('snapshot').finished;
+  assert.equal(finished.mode,13,'option updates preserve pending completed-image notification');
+  assert(finished.fraction>.9&&finished.fraction<=1,'PD completion uses paired scan lines for the autosave threshold');
   assert.equal(adapter.call('snapshot').finished,undefined,'completed image transferred once');
   m._free(adapter.pointer);
-  m._free(pointer);console.log('43 modes, silence rejection, synchronization, phase redraw, FSK ID, completed history, FFT and input level passed.');
+  m._free(pointer);console.log('46 modes, silence rejection, synchronization, phase redraw, FSK ID, completed history, FFT and input level passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

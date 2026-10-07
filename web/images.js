@@ -1,0 +1,8 @@
+/* Memory-only JPEG 2000 codec in its own worker. */
+'use strict';
+let jpegWorker;
+function jpegCall(action,args){if(!jpegWorker){const worker=new Worker('image-worker.js?v='+(globalThis.MMSAssetVersion||'')),pending=new Map();let sequence=0;jpegWorker={call:(action,args)=>new Promise((resolve,reject)=>{const id=++sequence;pending.set(id,{resolve,reject});try{worker.postMessage({id,action,args});}catch(error){pending.delete(id);reject(error);}})};worker.onmessage=({data})=>{const p=pending.get(data.id);if(!p)return;pending.delete(data.id);data.error?p.reject(Error(data.error)):p.resolve(data.result);};worker.onerror=event=>{for(const p of pending.values())p.reject(Error(event.message||'Image codec failed.'));pending.clear();worker.terminate();jpegWorker=null;};}return jpegWorker.call(action,args);}
+async function decodePicture(blob){
+ try{return await createImageBitmap(blob);}catch(error){const bytes=new Uint8Array(await blob.arrayBuffer());if(!(bytes[0]===255&&bytes[1]===79 || bytes[4]===106&&bytes[5]===80&&bytes[6]===32&&bytes[7]===32))throw error;const result=await jpegCall('decode',{bytes}),canvas=document.createElement('canvas');paint(canvas,result.pixels,result.width,result.height);return await createImageBitmap(canvas);}
+}
+async function encodeDigitalPicture(canvas,format='jp2',ratio=20){if(format==='jp2'){const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;return await jpegCall('encode',{pixels,width:canvas.width,height:canvas.height,ratio});}const blob=await new Promise(resolve=>canvas.toBlob(resolve,format==='jpeg'?'image/jpeg':'image/png',.9));if(!blob)throw Error('Could not encode picture.');return new Uint8Array(await blob.arrayBuffer());}
