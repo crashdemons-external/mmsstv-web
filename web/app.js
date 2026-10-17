@@ -11,7 +11,7 @@ const digital={engine:null,encoder:null,protocol:'sstv',snapshot:null,files:[],s
 function notifyView(){$('sample-status').textContent=(digital.protocol==='drm'?12000:11025)+' Hz';window.QSSTVUI?.refresh();if($('wefax-settings'))$('wefax-settings').hidden=digital.protocol==='drm'||!isWEFAXMode(state.tab==='tx'?tx.mode:state.mode<0?state.snapshot?.mode:state.mode);}
 Object.assign(defaults,{operatorName:'',operatorQth:'',operatorLocator:'',backgroundColor:'#dfe5e6',slowCpu:false,confirmDelete:false,confirmClose:false,lowResolution:false,cwWpm:15,cwFrequency:800,waterfallMax:-25,waterfallRange:35,waterfallAverage:.9});
 state.settings={...defaults,txVox:false,txCw:false,digitalImageSize:640,...state.settings};
-let lastVisual=0, micQueue=Promise.resolve(), pendingMic=0;
+let lastVisual=0, micQueue=Promise.resolve(), pendingMic=0, inputStop=null;
 function persist(key,value){try{localStorage.setItem('mmsstv.'+key,JSON.stringify(value));}catch(error){console.warn('Browser preferences could not be saved.',error);}}
 function status(text,error=false){$('status').textContent=text;$('status').classList.toggle('loading-error',error);notifyView();}
 function duration(seconds){seconds=Math.max(0,Math.floor(seconds));return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;}
@@ -172,11 +172,53 @@ function updateInputButtons(){
   $('pause-button').textContent=state.paused?'Resume':'Pause';$('mic-button').setAttribute('aria-pressed',String(state.input?.kind==='mic'));
   notifyView();
 }
-async function stopInput(finish=true){
+function queueMicrophoneSamples(samples,drmSamples){
+  if(!samples.length&&!drmSamples.length)return;
+  pendingMic++;
+  micQueue=micQueue.then(async()=>{
+    if(samples.length)renderSnapshot(await state.engine.call('process',{samples}));
+    if(digital.engine&&drmSamples.length)await renderDigital(await digital.engine.call('process',{samples:drmSamples}));
+  }).catch(failure).finally(()=>pendingMic--);
+}
+function receiveMicrophoneMessage(input,token,message){
+  if(message instanceof Float32Array){
+    if(!input.accepting)return;
+    if(token!==state.token&&!input.stopping)return;
+    recordInput(message,input.context.sampleRate,input);
+    const samples=input.resampler.push(message),drmSamples=input.drmResampler.push(message);state.elapsed+=message.length/input.context.sampleRate;$('time-status').textContent=duration(state.elapsed);
+    queueMicrophoneSamples(samples,drmSamples);
+    if(pendingMic>12)stopInput().then(()=>status('Microphone stopped: receiver could not keep up with input.',true)).catch(failure);
+  } else if(message?.type==='flush-ack')input.flushResolve?.(message.id);
+}
+function stopInput(finish=true){
+  if(inputStop)return inputStop;
+  const stopping=stopInputNow(finish);
+  inputStop=stopping.finally(()=>{inputStop=null;});
+  return inputStop;
+}
+async function stopInputNow(finish){
   ++state.token;const input=state.input;state.input=null;state.paused=false;
   if(input?.kind==='mic'){
-    input.node.port&&(input.node.port.onmessage=null);input.node.onaudioprocess=null;input.node.disconnect();input.source.disconnect();input.stream.getTracks().forEach(track=>track.stop());await input.context.close();await micQueue;
-    finishRecording(input);
+    input.stopping=true;input.source.disconnect();input.stream.getTracks().forEach(track=>track.stop());
+    if(!input.worklet)input.node.onaudioprocess=null;
+    if(input.worklet){
+      const id=++input.flushId;
+      await new Promise(resolve=>{
+        const timeout=setTimeout(resolve,500);
+        input.flushResolve=ackId=>{if(ackId!==id)return;clearTimeout(timeout);resolve();};
+        try{input.node.port.postMessage({type:'flush',id});}catch{clearTimeout(timeout);resolve();}
+      });
+      input.flushResolve=null;
+    }
+    input.accepting=false;
+    try{
+      const samples=input.resampler.push(new Float32Array(0),true),drmSamples=input.drmResampler.push(new Float32Array(0),true);
+      queueMicrophoneSamples(samples,drmSamples);await micQueue;
+    }catch(error){failure(error);}finally{
+      input.node.port&&(input.node.port.onmessage=null);input.node.onaudioprocess=null;input.node.disconnect();
+      try{await input.context.close();}catch(error){console.warn('Microphone audio context could not close cleanly.',error);}
+      finishRecording(input);
+    }
   }
   if(finish && state.engine){renderSnapshot(await state.engine.call('finish'),true);}
   updateInputButtons();$('source-name').textContent=input?'Stopped — '+input.name:'No audio input';
@@ -222,34 +264,37 @@ async function runFile(token){
   state.input=null;updateInputButtons();$('source-name').textContent=`Finished — ${input.name}`;$('file-progress').value=1;status(digital.protocol==='drm'?input.receivedDigital?'Audio complete — DRM file recovered.':`Audio complete — ${digital.snapshot?.status[11]||0}/${digital.snapshot?.status[12]||0} DRM segments.`:state.hasImage?'Audio file complete. Picture ready to save.':'Audio file complete. No image detected.');
 }
 async function startMicrophone(deviceId){
-  await stopInput();const token=++state.token;let stream,context;
+  await stopInput();const token=++state.token;let stream,context,input;
   try{
+    await resetReceiver();if(token!==state.token)return;
     if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone input requires HTTPS or localhost in this browser.');
     stream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined,echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:2},video:false});
     if(token!==state.token){stream.getTracks().forEach(track=>track.stop());return;}
-    context=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});await context.resume();await resetReceiver();
+    context=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});await context.resume();
     if(token!==state.token){stream.getTracks().forEach(track=>track.stop());await context.close();return;}
     const source=context.createMediaStreamSource(stream), resampler=new MMSAudio.Resampler(context.sampleRate),drmResampler=new MMSAudio.Resampler(context.sampleRate,12000);let node;
-    const feed=values=>{
-      if(token!==state.token)return;
-      recordInput(values,context.sampleRate);
-      if(pendingMic>12){stopInput().then(()=>status('Microphone stopped: receiver could not keep up with input.',true)).catch(failure);return;}
-      const samples=resampler.push(values),drmSamples=drmResampler.push(values);state.elapsed+=values.length/context.sampleRate;$('time-status').textContent=duration(state.elapsed);
-      if(!samples.length)return;pendingMic++;
-      micQueue=micQueue.then(async()=>{if(token===state.token){renderSnapshot(await state.engine.call('process',{samples}));if(digital.engine&&drmSamples.length)await renderDigital(await digital.engine.call('process',{samples:drmSamples}));}}).catch(failure).finally(()=>pendingMic--);
-    };
+    input={kind:'mic',name:stream.getAudioTracks()[0].label||'Microphone',context,source,node:null,stream,resampler,drmResampler,worklet:false,flushId:0,stopping:false,accepting:true};
+    const feed=values=>receiveMicrophoneMessage(input,token,values);
     try{
       if(!context.audioWorklet)throw new Error('AudioWorklet unavailable');
-      await context.audioWorklet.addModule(new URL('mic-worklet.js',location.href));
-      node=new AudioWorkletNode(context,'mmsstv-input',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{channel:state.settings.channel}});node.port.onmessage=event=>feed(event.data);
+      await context.audioWorklet.addModule(new URL('mic-worklet.js?v='+(globalThis.MMSAssetVersion||''),location.href));
+      node=new AudioWorkletNode(context,'mmsstv-input',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{channel:state.settings.channel}});input.worklet=true;node.port.onmessage=event=>receiveMicrophoneMessage(input,token,event.data);
     }catch(error){
       // Direct file:// use may restrict worklet scripts. Keep an input-only fallback.
       node=context.createScriptProcessor(4096,2,1);node.onaudioprocess=event=>{feed(MMSAudio.downmix(event.inputBuffer,state.settings.channel));event.outputBuffer.getChannelData(0).fill(0);};
     }
+    if(token!==state.token){stream.getTracks().forEach(track=>track.stop());await context.close();return;}
+    input.node=node;state.input=input;
     const silent=context.createGain();silent.gain.value=0;source.connect(node);node.connect(silent);silent.connect(context.destination);
-    state.input={kind:'mic',name:stream.getAudioTracks()[0].label||'Microphone',context,source,node,stream};state.elapsed=0;updateInputButtons();$('file-progress').value=0;$('source-name').textContent=state.input.name;status('Receiving audio from microphone…');
+    state.elapsed=0;updateInputButtons();$('file-progress').value=0;$('source-name').textContent=input.name;status('Receiving audio from microphone…');
     stream.getTracks().forEach(track=>track.addEventListener('ended',()=>{if(token===state.token)stopInput().catch(failure);}));
-  }catch(error){stream?.getTracks().forEach(track=>track.stop());if(context && context.state!=='closed')await context.close();failure(error.name==='NotAllowedError'?new Error('Microphone permission was denied. Allow this page to use the microphone and try again.'):error);}
+  }catch(error){
+    if(state.input===input)state.input=null;
+    if(input?.node?.port)input.node.port.onmessage=null;
+    input?.node?.disconnect();input?.source?.disconnect();stream?.getTracks().forEach(track=>track.stop());
+    if(context && context.state!=='closed')try{await context.close();}catch{}
+    updateInputButtons();failure(error.name==='NotAllowedError'?new Error('Microphone permission was denied. Allow this page to use the microphone and try again.'):error);
+  }
 }
 async function microphoneDialog(){
   if(state.input?.kind==='mic'){await stopInput();return;}

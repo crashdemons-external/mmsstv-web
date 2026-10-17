@@ -13,6 +13,9 @@ for(const rate of [8000,11025,22050,44100,48000,96000]){
 }
 const high=Float32Array.from({length:48000},(_,i)=>Math.sin(2*Math.PI*9000*i/48000)),filtered=new Resampler(48000).push(high,true);
 assert.ok(Math.sqrt(filtered.slice(100,10000).reduce((n,x)=>n+x*x,0)/9900)<.01,'anti-aliasing rejects out-of-band tones');
+const liveResampler=new Resampler(48000),liveChunks=[liveResampler.push(high.subarray(0,16000)),liveResampler.push(high.subarray(16000))];
+liveChunks.push(liveResampler.push(new Float32Array(0),true));
+assert.equal(liveChunks.reduce((n,chunk)=>n+chunk.length,0),filtered.length,'final empty push drains the live resampler tail');
 const bytes=new ArrayBuffer(52),v=new DataView(bytes),ascii=(p,s)=>[...s].forEach((c,i)=>v.setUint8(p+i,c.charCodeAt(0)));
 ascii(0,'RIFF');v.setUint32(4,44,true);ascii(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,48000,true);v.setUint32(28,192000,true);v.setUint16(32,4,true);v.setUint16(34,16,true);ascii(36,'data');v.setUint32(40,8,true);v.setInt16(44,16384,true);v.setInt16(46,-16384,true);v.setInt16(48,8192,true);v.setInt16(50,-8192,true);
 assert.deepEqual([...readWav(bytes,'left').samples],[.5,.25]);assert.deepEqual([...readWav(bytes,'right').samples],[-.5,-.25]);assert.deepEqual([...readWav(bytes,'mix').samples],[0,0]);
@@ -34,6 +37,12 @@ for(const [channel,expected] of [['left',.5],['right',-.25],['mix',.125]]){
   for(let n=0;n<33;n++)microphone.process([[new Float32Array(128).fill(.5),new Float32Array(128).fill(-.25)]],[[output]]);
   assert.equal(microphone.frames.length,2,'microphone buffers emitted continuously');
   for(const frame of microphone.frames){assert.equal(frame.length,2048);assert.ok(frame.every(value=>value===expected),'selected microphone channel');}
+  microphone.port.onmessage({data:{type:'flush',id:7}});
+  assert.equal(microphone.frames[2].length,128,'flush emits the final partial microphone block');
+  assert.ok(microphone.frames[2].every(value=>value===expected),'partial microphone block keeps channel selection');
+  assert.deepEqual({...microphone.frames[3]},{type:'flush-ack',id:7},'flush acknowledges after posting the partial block');
+  microphone.process([[new Float32Array(128).fill(1)]],[[output]]);
+  assert.equal(microphone.frames.length,4,'flushed worklet ignores later input quanta');
   assert.ok(output.every(value=>value===0),'microphone input never goes to speakers');
 }
-console.log('WAV/MMV, malformed files, BMP export, 6 resampling rates, anti-aliasing and microphone worklet routing passed.');
+console.log('WAV/MMV, malformed files, BMP export, 6 resampling rates, anti-aliasing, microphone routing and partial-block flushing passed.');

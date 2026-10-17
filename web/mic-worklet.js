@@ -1,11 +1,22 @@
 'use strict';
 class MMSSTVInput extends AudioWorkletProcessor {
   constructor(options) {
-    super();this.channel=options.processorOptions?.channel||'left';this.values=new Float32Array(2048);this.position=0;
+    super();this.channel=options.processorOptions?.channel||'left';this.values=new Float32Array(2048);this.position=0;this.active=true;
+    this.port.onmessage=event=>{
+      if(event.data?.type!=='flush')return;
+      this.flush(event.data.id);
+    };
+  }
+  flush(id) {
+    this.active=false;
+    if(this.position) {
+      this.port.postMessage(this.values.slice(0,this.position));this.values=new Float32Array(2048);this.position=0;
+    }
+    this.port.postMessage({type:'flush-ack',id});
   }
   process(inputs,outputs) {
     const channels=inputs[0];
-    if(channels && channels.length) {
+    if(this.active && channels && channels.length) {
       const length=channels[0].length;
       for(let i=0;i<length;i++) {
         let value=0;

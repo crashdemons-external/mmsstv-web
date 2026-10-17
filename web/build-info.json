@@ -25,7 +25,7 @@
     "coreSha256": "70e8e8796c7eb66cc226813378b3d4af3b6edba1a84c649fe3c80387ec32ddaf",
     "wasmSha256": "11208424a79145a747c4f60d67dd06e27bae34b562411a8267b2295cd9db17b4"
   },
-  "assetVersion": "4831b5bcf926fba4",
+  "assetVersion": "65dcd8e2d1fb8fe9",
   "wefax": {
     "version": "fldigi 4.2.13",
     "modes": [
